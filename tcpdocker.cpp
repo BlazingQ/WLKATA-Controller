@@ -80,3 +80,70 @@ void send(const char* dstIP, int dstPort, char* message) {
     // 关闭socket
     close(sock);
 }
+
+// void listen_and_respond(const char* serverIP, int serverPort) {
+//     int server_fd, new_socket;
+//     struct sockaddr_in address;
+//     socklen_t addrlen = sizeof(address);
+    
+//     // 创建socket文件描述符
+//     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+//         perror("socket failed");
+//         exit(EXIT_FAILURE);
+//     }
+    
+//     // 允许地址重用
+//     int opt = 1;
+//     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
+//         perror("setsockopt");
+//         exit(EXIT_FAILURE);
+//     }
+    
+//     // 设置服务器地址信息
+//     address.sin_family = AF_INET;
+//     address.sin_addr.s_addr = INADDR_ANY;
+//     address.sin_port = htons(serverPort);
+    
+//     // 绑定socket
+//     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+//         perror("bind failed");
+//         exit(EXIT_FAILURE);
+//     }
+    
+//     // 开始监听
+//     if (listen(server_fd, 3) < 0) {
+//         perror("listen");
+//         exit(EXIT_FAILURE);
+//     }
+    
+//     std::cout << "Server is listening on " << serverIP << ":" << serverPort << "\n";
+    
+//     while (true) { // 无限循环监听
+//         addrlen = sizeof(address);
+//         if ((new_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen)) < 0) {
+//             perror("accept");
+//             exit(EXIT_FAILURE);
+//         }
+        
+//         // 接收消息
+//         char buffer[1024] = {0};
+//         int valread = read(new_socket, buffer, 1024);
+//         if (valread > 0) {
+//             std::string message(buffer);
+            
+//             // 调用验证接口
+//             std::string response = call_bach(message);
+            
+//             // 发送响应
+//             send(new_socket, serverPort, response.c_str(), );
+            
+//             std::cout << "Message sent: " << response << "\n";
+//         }
+        
+//         // 关闭连接
+//         close(new_socket);
+//     }
+    
+//     // 关闭服务器socket
+//     close(server_fd);
+// }

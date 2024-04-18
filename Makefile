@@ -1,26 +1,31 @@
-# 编译器设置 - 使用 g++。
+# 编译器设置
 CC=g++
 
-# 编译器标志 -g 添加调试信息，-Wall 开启额外警告，-std=c++11 使用 C++11 标准。
+# 编译器标志，添加-std=c++11以支持C++11特性
 CFLAGS=-g -Wall
+
+# 链接器标志，指定要链接的库文件
+LDFLAGS=-L./arm_converter/lib -lverifier
 
 # 目标可执行文件名
 TARGET=controller
 
-# 构建目标可执行文件，依赖于 controller.o 和 tcpdocker.o。
+# 项目中所有相关的源文件
+SRC=controller.cpp tcpdocker.cpp
+
+# 对应的源文件生成的目标文件列表
+OBJ=$(SRC:.cpp=.o)
+
+# 默认目标（all）将构建目标程序
 all: $(TARGET)
 
-# 链接生成最终的可执行文件
-$(TARGET): controller.o tcpdocker.o
-	$(CC) $(CFLAGS) -o $(TARGET) controller.o tcpdocker.o
+# 链接目标程序和verifier库
+$(TARGET): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) -o $(TARGET) $(LDFLAGS)
 
-# 编译 controller.cpp 生成对象文件。
-controller.o: controller.cpp tcpdocker.h
-	$(CC) $(CFLAGS) -c controller.cpp
-
-# 编译 tcpdocker.cpp 生成对象文件。
-tcpdocker.o: tcpdocker.cpp tcpdocker.h
-	$(CC) $(CFLAGS) -c tcpdocker.cpp
+# 编译每个源文件
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c $< -o $@
 
 # 清理生成的文件
 clean:
