@@ -1,13 +1,28 @@
 #include "tcpdocker.h"
 #include "arm_converter/armVerifier.hpp"
-#include <iostream>
 
 using namespace std;
 
 int main(){
-    cout<<"start"<<endl;
-    listen("192.168.1.102", 12345);
+    int server_fd = setup_server(12345);
+    if (server_fd < 0){
+        return 1;
+    }
 
-    // send("192.168.1.102", 12345, "hello from docker!");
+    while(true){
+        int client_fd = wait_for_connection(server_fd);
+        if (client_fd < 0){
+            return 1;
+        }
+        char buffer[4096] = {0};
+        if(receive_message(client_fd, buffer, 4096)){//process
+            strcat(buffer, "send back");
+            send_message(client_fd, buffer);
+            
+        }
+        close_connection(client_fd);
+    }
+    close_connection(server_fd);
+
     return 0;
 }
