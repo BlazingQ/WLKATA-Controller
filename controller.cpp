@@ -1,5 +1,5 @@
 #include "tcpdocker.h"
-#include "arm_converter/armVerifier.hpp"
+#include "controller.hpp"
 
 using namespace std;
 
@@ -16,8 +16,12 @@ int main(){
         }
         char buffer[4096] = {0};
         if(receive_message(client_fd, buffer, 4096)){//process
-            strcat(buffer, "send back");
-            send_message(client_fd, buffer);
+            // strcat(buffer, "send back");
+            // send_message(client_fd, buffer);
+            string cmd = buffer;
+            string jsonstr = transCmd(cmd);
+            cout<<jsonstr<<endl;
+            cout<<endl<<call_bach(jsonstr)<<endl;
             
         }
         close_connection(client_fd);
@@ -25,4 +29,67 @@ int main(){
     close_connection(server_fd);
 
     return 0;
+}
+
+json parseCommand(const std::string& cmd) {
+    std::istringstream iss(cmd);
+    std::string part;
+    json behavior;
+    behavior["X"] = json::array();
+    behavior["R"] = json::array();
+
+    while (iss >> part) {
+        if (part[0] == 'M') {
+            behavior["Mode"] = (part == "M20") ? "Cartesian" : "Angel";
+        } else if (part[0] == 'G') {
+            if (part == "G00") {
+                behavior["Motion type"] = "Joint";
+            } else if (part == "G01") {
+                behavior["Motion type"] = "Linear";
+            }
+        } else if (part[0] == 'X' || part[0] == 'Y' || part[0] == 'Z') {
+            std::size_t pos = part.find_first_not_of("XYZ");
+            if (pos != std::string::npos) {
+                behavior["X"].push_back(std::stod(part.substr(pos)));
+            }
+        } else if (part[0] == 'A' || part[0] == 'B' || part[0] == 'C') {
+            std::size_t pos = part.find_first_not_of("ABC");
+            if (pos != std::string::npos) {
+                behavior["R"].push_back(std::stod(part.substr(pos)));
+            }
+        }
+    }
+
+    // Speed is fixed as 2000
+    behavior["Speed"] = 2000;
+
+    return behavior;
+}
+
+// 主函数，处理整个指令字符串
+std::string transCmd(const std::string& cmd) {
+    std::istringstream iss(cmd);
+    std::string token;
+    json result;
+    result["Obstacles"] = json::array({ {{"X", {-10, 198, 155}}} });
+    result["Components"] = json::array({
+        {
+            {"BasePosition", {0, 0, 0}},
+            {"InitialState", {
+                {"Mode", "Cartesian"},
+                {"X", {0, 0, 0}},
+                {"R", {0, 0, 0}}
+            }},
+            {"Behavior", json::array()}
+        }
+    });
+
+    while (getline(iss, token, ',')) {
+        if (token.find("M20") != std::string::npos || token.find("M21") != std::string::npos) {
+            json behavior = parseCommand(token);
+            result["Components"][0]["Behavior"].push_back(behavior);
+        }
+    }
+
+    return result.dump(4);  // 输出格式化的 JSON 字符串
 }
