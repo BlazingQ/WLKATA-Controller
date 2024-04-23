@@ -21,7 +21,11 @@ int main(){
             string cmd = buffer;
             string jsonstr = transCmd(cmd);
             cout<<jsonstr<<endl;
-            cout<<endl<<call_bach(jsonstr)<<endl;
+            // cout<<endl<<arm_verify(jsonstr)<<endl;
+            if(!arm_verify(jsonstr)){
+                string controljsonstr;
+                cout<<endl<<arm_control(controljsonstr)<<endl;
+            }
             
         }
         close_connection(client_fd);
@@ -92,7 +96,7 @@ std::string transCmd(const std::string& packet) {
 
     
     json result;
-    result["Obstacles"] = json::array({ {{"X", {-10, 198, 155}}} });
+    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {-10, 198, 155}}} });
     result["Components"] = json::array({
         {
             {"BasePosition", {0, 0, 0}},

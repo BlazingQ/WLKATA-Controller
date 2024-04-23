@@ -3,6 +3,7 @@
 #include <vector>
 #include <sstream>
 #include "arm_converter/armVerifier.hpp"
+#include "arm_controller/armController.hpp"
 #include "nlohmann/json.hpp"
 using json = nlohmann::json;
 
