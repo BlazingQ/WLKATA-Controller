@@ -31,6 +31,24 @@ int main(){
     return 0;
 }
 
+json parseInitialState(const std::string& data) {
+    std::istringstream iss(data);
+    std::string value;
+    std::vector<float> locs;
+
+    while (getline(iss, value, ',')) {
+        locs.push_back(std::stof(value));
+    }
+
+    json initialState = {
+        {"Mode", "Cartesian"},
+        {"X", {locs[0], locs[1], locs[2]}},
+        {"R", {locs[3], locs[4], locs[5]}}
+    };
+
+    return initialState;
+}
+
 json parseCommand(const std::string& cmd) {
     std::istringstream iss(cmd);
     std::string part;
@@ -67,22 +85,24 @@ json parseCommand(const std::string& cmd) {
 }
 
 // 主函数，处理整个指令字符串
-std::string transCmd(const std::string& cmd) {
-    std::istringstream iss(cmd);
-    std::string token;
+std::string transCmd(const std::string& packet) {
+    std::size_t delimiterPos = packet.find(';');
+    std::string initialStateData = packet.substr(0, delimiterPos);
+    std::string commands = packet.substr(delimiterPos + 1);
+
+    
     json result;
     result["Obstacles"] = json::array({ {{"X", {-10, 198, 155}}} });
     result["Components"] = json::array({
         {
             {"BasePosition", {0, 0, 0}},
-            {"InitialState", {
-                {"Mode", "Cartesian"},
-                {"X", {0, 0, 0}},
-                {"R", {0, 0, 0}}
-            }},
+            {"InitialState", parseInitialState(initialStateData)},
             {"Behavior", json::array()}
         }
     });
+
+    std::istringstream iss(commands);
+    std::string token;
 
     while (getline(iss, token, ',')) {
         if (token.find("M20") != std::string::npos || token.find("M21") != std::string::npos) {

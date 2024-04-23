@@ -1,3 +1,6 @@
 [submodule "arm_converter"]
 	path = arm_converter
-	url = https://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@github.com/TieKotek/arm_converter.git
+	url = https://@github.com/TieKotek/arm_converter.git
+[submodule "arm_controller"]
+	path = arm_controller
+	url = https://@github.com/TieKotek/arm_controller.git
