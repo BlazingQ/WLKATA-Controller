@@ -23,8 +23,13 @@ int main(){
             cout<<jsonstr<<endl;
             // cout<<endl<<arm_verify(jsonstr)<<endl;
             if(!arm_verify(jsonstr)){
-                // string controljsonstr;
-                cout<<endl<<arm_control(jsonstr)<<endl;
+                string controljsonstr;
+                string cmdsendback;
+                controljsonstr = arm_control(jsonstr);
+                cout<<endl<<controljsonstr<<endl;
+                cmdsendback = jsonToCmds(controljsonstr);
+                cout<<endl<<cmdsendback<<endl;
+                
             }
             
         }
@@ -123,4 +128,44 @@ std::string transCmd(const std::string& packet) {
     }
 
     return result.dump(4);  // 输出格式化的 JSON 字符串
+}
+
+std::string generateCmd(const json& behavior) {
+    std::string cmd = "M20 G90 "; // 假设都是绝对坐标系统
+    cmd += behavior["Motion type"] == "Joint" ? "G00 " : "G01 ";
+
+    // 处理 X, Y, Z 坐标
+    std::vector<std::string> axis = {"X", "Y", "Z"};
+    for (int i = 0; i < 3; ++i) {
+        cmd += axis[i] + doubleToStr(behavior["X"][i]) + " ";
+    }
+
+    // 处理 A, B, C 坐标（旋转）
+    axis = {"A", "B", "C"};
+    for (int i = 0; i < 3; ++i) {
+        cmd += axis[i] + doubleToStr(behavior["R"][i]) + " ";
+    }
+
+    return cmd;
+}
+
+std::string jsonToCmds(const std::string& jsonString) {
+    json j = json::parse(jsonString);
+    std::string cmds = "";
+
+    // 遍历行为数组并生成指令
+    for (const auto& behavior : j["Components"][0]["Behavior"]) {
+        if (!cmds.empty()) {
+            cmds += ",";
+        }
+        cmds += generateCmd(behavior);
+    }
+
+    return cmds;
+}
+
+std::string doubleToStr(double value) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << value;
+    return oss.str();
 }
