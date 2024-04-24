@@ -23,8 +23,8 @@ int main(){
             cout<<jsonstr<<endl;
             // cout<<endl<<arm_verify(jsonstr)<<endl;
             if(!arm_verify(jsonstr)){
-                string controljsonstr;
-                cout<<endl<<arm_control(controljsonstr)<<endl;
+                // string controljsonstr;
+                cout<<endl<<arm_control(jsonstr)<<endl;
             }
             
         }
@@ -38,10 +38,10 @@ int main(){
 json parseInitialState(const std::string& data) {
     std::istringstream iss(data);
     std::string value;
-    std::vector<float> locs;
+    std::vector<double> locs;
 
     while (getline(iss, value, ',')) {
-        locs.push_back(std::stof(value));
+        locs.push_back(std::stod(value));
     }
 
     json initialState = {
@@ -107,12 +107,19 @@ std::string transCmd(const std::string& packet) {
 
     std::istringstream iss(commands);
     std::string token;
-
+    json lastCommand;
+    bool hasTargetState = false;
     while (getline(iss, token, ',')) {
         if (token.find("M20") != std::string::npos || token.find("M21") != std::string::npos) {
             json behavior = parseCommand(token);
+            lastCommand = behavior;
+            hasTargetState = true;
             result["Components"][0]["Behavior"].push_back(behavior);
         }
+    }
+
+    if (hasTargetState) {
+        result["Components"][0]["TargetState"] = lastCommand;
     }
 
     return result.dump(4);  // 输出格式化的 JSON 字符串
