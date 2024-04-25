@@ -41,7 +41,7 @@ int wait_for_connection(int server_fd) {
     return new_socket;
 }
 
-bool send_message(int sock, char* message) {
+bool send_message(int sock, const char* message) {
     if (send(sock, message, strlen(message), 0) < 0) {
         std::cerr << "Failed to send message." << std::endl;
         return false;

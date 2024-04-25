@@ -12,7 +12,7 @@
 // void send(const char* dstIP, int dstPort, char* message);
 int setup_server(int port);
 int wait_for_connection(int server_fd);
-bool send_message(int sock, char* message);
+bool send_message(int sock, const char* message);
 bool receive_message(int sock, char* buffer, size_t buffer_size);
 void close_connection(int sock);
 

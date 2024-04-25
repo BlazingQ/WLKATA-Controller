@@ -8,8 +8,8 @@
 using json = nlohmann::json;
 
 json parseInitialState(const std::string& data);
-string transCmd(const string& cmd);
-json parseCommand(const string& cmd);
+std::string transCmd(const std::string& cmd);
+json parseCommand(const std::string& cmd);
 std::string generateCmd(const json& behavior);
 std::string jsonToCmds(const std::string& jsonString);
 std::string doubleToStr(double value);

@@ -29,7 +29,11 @@ int main(){
                 cout<<endl<<controljsonstr<<endl;
                 cmdsendback = jsonToCmds(controljsonstr);
                 cout<<endl<<cmdsendback<<endl;
+                send_message(client_fd, cmdsendback.c_str());
                 
+            }
+            else{//safe
+                send_message(client_fd, "OK");
             }
             
         }
@@ -101,7 +105,7 @@ std::string transCmd(const std::string& packet) {
 
     
     json result;
-    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {-10, 198, 155}}} });
+    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {-10, 170, 120}}} });
     result["Components"] = json::array({
         {
             {"BasePosition", {0, 0, 0}},
