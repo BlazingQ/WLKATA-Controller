@@ -105,7 +105,7 @@ std::string transCmd(const std::string& packet) {
 
     
     json result;
-    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {-10, 170, 120}}} });
+    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {-15, 173, 150}}} });
     result["Components"] = json::array({
         {
             {"BasePosition", {0, 0, 0}},
