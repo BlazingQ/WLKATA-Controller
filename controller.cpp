@@ -3,6 +3,10 @@
 
 using namespace std;
 
+std::vector<double> locs;
+bool isincre = false;
+bool isangle = false;
+
 int main(){
     int server_fd = setup_server(12345);
     if (server_fd < 0){
@@ -21,14 +25,16 @@ int main(){
             string cmd = buffer;
             string jsonstr = transCmd(cmd);
             cout<<jsonstr<<endl;
-            // cout<<endl<<arm_verify(jsonstr)<<endl;
-            if(!arm_verify(jsonstr)){
+            
+            if(!jsonstr.empty() && !arm_verify(jsonstr)){
                 string controljsonstr;
                 string cmdsendback;
                 controljsonstr = arm_control(jsonstr);
-                cout<<endl<<controljsonstr<<endl;
-                cmdsendback = jsonToCmds(controljsonstr);
-                cout<<endl<<cmdsendback<<endl;
+                cout<<"\ncontroljsonstr = "<<controljsonstr<<endl;
+                if(!controljsonstr.empty()){
+                    cmdsendback = jsonToCmds(controljsonstr);
+                }
+                cout<<"\ncmdsendback = "<<cmdsendback<<endl;
                 send_message(client_fd, cmdsendback.c_str());
                 
             }
@@ -44,10 +50,11 @@ int main(){
     return 0;
 }
 
+
 json parseInitialState(const std::string& data) {
     std::istringstream iss(data);
     std::string value;
-    std::vector<double> locs;
+    
 
     while (getline(iss, value, ',')) {
         locs.push_back(std::stod(value));
@@ -66,29 +73,126 @@ json parseCommand(const std::string& cmd) {
     std::istringstream iss(cmd);
     std::string part;
     json behavior;
+    isincre = false;
+    isangle = false;
     behavior["X"] = json::array();
     behavior["R"] = json::array();
-
+    behavior["Theta"] = json::array();
+    behavior["Mode"] = "Cartesian";
+    behavior["Motion type"] = "Linear";
     while (iss >> part) {
         if (part[0] == 'M') {
-            behavior["Mode"] = (part == "M20") ? "Cartesian" : "Angel";
+            if(part == "M20"){
+                behavior["Mode"] = "Cartesian";
+            }
+            else if(part == "M21"){
+                behavior["Mode"] = "Angle";
+                isangle = true;
+            }
         } else if (part[0] == 'G') {
             if (part == "G00") {
                 behavior["Motion type"] = "Joint";
             } else if (part == "G01") {
                 behavior["Motion type"] = "Linear";
+            } else if (part == "G91"){
+                isincre = true;
             }
-        } else if (part[0] == 'X' || part[0] == 'Y' || part[0] == 'Z') {
-            std::size_t pos = part.find_first_not_of("XYZ");
+        } else if (part[0] == 'X' || part[0] == 'Y' || part[0] == 'Z' ||
+         part[0] == 'A' || part[0] == 'B' || part[0] == 'C') {
+            std::size_t pos = part.find_first_not_of("ABCXYZ");
             if (pos != std::string::npos) {
-                behavior["X"].push_back(std::stod(part.substr(pos)));
+                switch (part[0])
+                {
+                case 'X':
+                    if(!isincre){
+                        locs[0] = std::stod(part.substr(pos));
+                    }
+                    else{
+                        locs[0] += std::stod(part.substr(pos));
+                    }
+                    if(!isangle){
+                        behavior["X"].push_back(locs[0]);
+                    }else{
+                        behavior["Theta"].push_back(locs[0]);
+                    }
+                    break;
+                case 'Y':
+                    if(!isincre){
+                        locs[1] = std::stod(part.substr(pos));
+                    }
+                    else{
+                        locs[1] += std::stod(part.substr(pos));
+                    }
+                    if(!isangle){
+                        behavior["X"].push_back(locs[1]);
+                    }else{
+                        behavior["Theta"].push_back(locs[1]);
+                    }
+                    break;
+                case 'Z':
+                    if(!isincre){
+                        locs[2] = std::stod(part.substr(pos));
+                    }
+                    else{
+                        locs[2] += std::stod(part.substr(pos));
+                    }
+                    if(!isangle){
+                        behavior["X"].push_back(locs[2]);
+                    }else{
+                        behavior["Theta"].push_back(locs[2]);
+                    }
+                    break;
+                case 'A':
+                    if(!isincre){
+                        locs[3] = std::stod(part.substr(pos));
+                    }
+                    else{
+                        locs[3] += std::stod(part.substr(pos));
+                    }
+                    if(!isangle){
+                        behavior["R"].push_back(locs[3]);
+                    }else{
+                        behavior["Theta"].push_back(locs[3]);
+                    }
+                    break;
+                case 'B':
+                    if(!isincre){
+                        locs[4] = std::stod(part.substr(pos));
+                    }
+                    else{
+                        locs[4] += std::stod(part.substr(pos));
+                    }
+                    if(!isangle){
+                        behavior["R"].push_back(locs[4]);
+                    }else{
+                        behavior["Theta"].push_back(locs[4]);
+                    }
+                    break;
+                case 'C':
+                    if(!isincre){
+                        locs[5] = std::stod(part.substr(pos));
+                    }
+                    else{
+                        locs[5] += std::stod(part.substr(pos));
+                    }
+                    if(!isangle){
+                        behavior["R"].push_back(locs[5]);
+                    }else{
+                        behavior["Theta"].push_back(locs[5]);
+                    }
+                    break;
+                default:
+                    break;
+                }
+                
             }
-        } else if (part[0] == 'A' || part[0] == 'B' || part[0] == 'C') {
-            std::size_t pos = part.find_first_not_of("ABC");
-            if (pos != std::string::npos) {
-                behavior["R"].push_back(std::stod(part.substr(pos)));
-            }
-        }
+        } 
+        // else if (part[0] == 'A' || part[0] == 'B' || part[0] == 'C') {
+        //     std::size_t pos = part.find_first_not_of("ABC");
+        //     if (pos != std::string::npos) {
+        //         behavior["R"].push_back(std::stod(part.substr(pos)));
+        //     }
+        // }
     }
 
     // Speed is fixed as 2000
@@ -103,9 +207,10 @@ std::string transCmd(const std::string& packet) {
     std::string initialStateData = packet.substr(0, delimiterPos);
     std::string commands = packet.substr(delimiterPos + 1);
 
+    locs.clear();
     
     json result;
-    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {-15, 173, 150}}} });
+    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {100, 100, 100}}} });
     result["Components"] = json::array({
         {
             {"BasePosition", {0, 0, 0}},
@@ -130,7 +235,9 @@ std::string transCmd(const std::string& packet) {
     if (hasTargetState) {
         result["Components"][0]["TargetState"] = lastCommand;
     }
-
+    if(result["Components"][0]["Behavior"].empty()){
+        return "";
+    }
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
 
