@@ -6,8 +6,10 @@ using namespace std;
 std::vector<double> locs;
 bool isincre = false;
 bool isangle = false;
+map<int, json> armConfigs;
 
 int main(){
+    initializeArmConfigs();
     int server_fd = setup_server(12345);
     if (server_fd < 0){
         return 1;
@@ -204,13 +206,16 @@ json parseCommand(const std::string& cmd) {
 // 主函数，处理整个指令字符串
 std::string transCmd(const std::string& packet) {
     std::size_t delimiterPos = packet.find(';');
-    std::string initialStateData = packet.substr(0, delimiterPos);
-    std::string commands = packet.substr(delimiterPos + 1);
+    std::size_t delimiterRPos = packet.rfind(';');
+    int armindex = std::stoi(packet.substr(0, delimiterPos));
+    std::string initialStateData = packet.substr(delimiterPos + 1, delimiterRPos - delimiterPos - 1);
+    std::string commands = packet.substr(delimiterRPos + 1);
 
     locs.clear();
     
     json result;
-    result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {100, 100, 100}}} });
+    // result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {100, 100, 100}}} });
+    result["Obstacles"] = json::array();
     result["Components"] = json::array({
         {
             {"BasePosition", {0, 0, 0}},
@@ -218,7 +223,7 @@ std::string transCmd(const std::string& packet) {
             {"Behavior", json::array()}
         }
     });
-
+    basicArmInfo(result, armindex);
     std::istringstream iss(commands);
     std::string token;
     json lastCommand;
@@ -279,4 +284,39 @@ std::string doubleToStr(double value) {
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(2) << value;
     return oss.str();
+}
+
+void initializeArmConfigs() {
+    // 初始化示例数据
+    armConfigs[1] = {
+        {"BasePosition", {0, 0, 0}},
+        {"Obstacles", {{{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}}}
+    };
+    armConfigs[2] = {
+        {"BasePosition", {420, 230, 0}},
+        {"Obstacles", {{{"X", {50, 100, 150}}, {"Radius", 20}}}}
+    };
+    armConfigs[3] = {
+        {"BasePosition", {800, 230, 0}},
+        {"Obstacles", {{{"X", {30, 60, 90}}, {"Radius", 10}}}}
+    };
+    armConfigs[4] = {
+        {"BasePosition", {800, -230, 0}},
+        {"Obstacles", {
+        {{"X", {800, -55, 205}}, {"Radius", 10}}}}
+    };
+    armConfigs[5] = {
+        {"BasePosition", {0, 0, 0}},
+        {"Obstacles", {{{"X", {0, 0, 0}}, {"Radius", 10}}}}
+    };
+}
+
+
+void basicArmInfo(json& result, int armindex){//basePosition and Obstacles
+    if (armConfigs.find(armindex) != armConfigs.end()) {
+        result["Components"][0]["BasePosition"] = armConfigs[armindex]["BasePosition"];
+        result["Obstacles"] = armConfigs[armindex]["Obstacles"];
+    } else {
+        cout << "Invalid arm index." << endl;
+    }
 }

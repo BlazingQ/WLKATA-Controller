@@ -13,3 +13,5 @@ json parseCommand(const std::string& cmd);
 std::string generateCmd(const json& behavior);
 std::string jsonToCmds(const std::string& jsonString);
 std::string doubleToStr(double value);
+void initializeArmConfigs();
+void basicArmInfo(json& result, int armindex);
