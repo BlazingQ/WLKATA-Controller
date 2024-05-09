@@ -22,10 +22,8 @@ int main(){
         }
         char buffer[4096] = {0};
         if(receive_message(client_fd, buffer, 4096)){//process
-            // strcat(buffer, "send back");
-            // send_message(client_fd, buffer);
             string cmd = buffer;
-            string jsonstr = transCmd(cmd);
+            string jsonstr = transCmds(cmd);
             cout<<jsonstr<<endl;
             
             if(!jsonstr.empty() && !arm_verify(jsonstr)){
@@ -53,15 +51,23 @@ int main(){
 }
 
 
+// void basicArmInfo(json& result, int armindex, int index){//basePosition and Obstacles
+//     if (armConfigs.find(armindex) != armConfigs.end()) {
+//         result["Components"][index]["BasePosition"] = armConfigs[armindex]["BasePosition"];
+//         result["Obstacles"].push_back(armConfigs[armindex]["Obstacles"]);
+//     } else {
+//         cout << "Invalid arm index." << endl;
+//     }
+// }
+
 json parseInitialState(const std::string& data) {
     std::istringstream iss(data);
     std::string value;
-    
+    locs.clear();
 
     while (getline(iss, value, ',')) {
         locs.push_back(std::stod(value));
     }
-
     json initialState = {
         {"Mode", "Cartesian"},
         {"X", {locs[0], locs[1], locs[2]}},
@@ -203,27 +209,30 @@ json parseCommand(const std::string& cmd) {
     return behavior;
 }
 
-// 主函数，处理整个指令字符串
-std::string transCmd(const std::string& packet) {
-    std::size_t delimiterPos = packet.find(';');
-    std::size_t delimiterRPos = packet.rfind(';');
-    int armindex = std::stoi(packet.substr(0, delimiterPos));
-    std::string initialStateData = packet.substr(delimiterPos + 1, delimiterRPos - delimiterPos - 1);
-    std::string commands = packet.substr(delimiterRPos + 1);
+json parseComponent(std::string singleArm, json& result){
+    json component;
+    std::size_t delimiterPos = singleArm.find(';');
+    std::size_t delimiterRPos = singleArm.rfind(';');
+    int armindex = std::stoi(singleArm.substr(0, delimiterPos));
+    std::string initialStateData = singleArm.substr(delimiterPos + 1, delimiterRPos - delimiterPos - 1);
+    std::string commands = singleArm.substr(delimiterRPos + 1);
+    // result["Components"] = json::array({
+    //     {
+    //         {"BasePosition", {0, 0, 0}},
+    //         {"InitialState", parseInitialState(initialStateData)},
+    //         {"Behavior", json::array()}
+    //     }
+    // });
+    // basicArmInfo(result, armindex);
+    if (armConfigs.find(armindex) != armConfigs.end()) {
+        component["BasePosition"] = armConfigs[armindex]["BasePosition"];
+        result["Obstacles"].push_back(armConfigs[armindex]["Obstacles"]);
+    } else {
+        cout << "Invalid arm index." << endl;
+    }
+    component["InitialState"] = parseInitialState(initialStateData);
+    component["Behavior"] = json::array();
 
-    locs.clear();
-    
-    json result;
-    // result["Obstacles"] = json::array({ {{"Radius", 10.0},{"X", {100, 100, 100}}} });
-    result["Obstacles"] = json::array();
-    result["Components"] = json::array({
-        {
-            {"BasePosition", {0, 0, 0}},
-            {"InitialState", parseInitialState(initialStateData)},
-            {"Behavior", json::array()}
-        }
-    });
-    basicArmInfo(result, armindex);
     std::istringstream iss(commands);
     std::string token;
     json lastCommand;
@@ -233,16 +242,49 @@ std::string transCmd(const std::string& packet) {
             json behavior = parseCommand(token);
             lastCommand = behavior;
             hasTargetState = true;
-            result["Components"][0]["Behavior"].push_back(behavior);
+            component["Behavior"].push_back(behavior);
         }
     }
 
     if (hasTargetState) {
-        result["Components"][0]["TargetState"] = lastCommand;
+        component["TargetState"] = lastCommand;
     }
-    if(result["Components"][0]["Behavior"].empty()){
-        return "";
+
+    if(component["Behavior"].empty()){//放弃之后的验证与控制生成
+        return NULL;
     }
+    return component;
+}
+
+// 主函数，处理整个指令字符串
+std::string transCmds(const std::string& packet) {
+    json result;
+    result["Obstacles"] = json::array();
+    result["Components"] = json::array();
+    // int index = 0;
+    std::string singleArm;
+    std::string strcopy = packet;//auto deep copy
+    std::size_t AndPos = strcopy.find('&');
+    while(AndPos != std::string::npos){
+        singleArm = strcopy.substr(0, AndPos);
+        //func here
+        json component = parseComponent(singleArm, result);
+        if(component == NULL){//no behavior
+            return "";
+        }
+        result["Components"].push_back(component);
+        strcopy = strcopy.substr(AndPos + 1);
+        AndPos = strcopy.find('&');
+        // index++;
+    }
+    if(strcopy != ""){
+        json component = parseComponent(strcopy, result);
+        if(component == NULL){//no behavior
+            return "";
+        }
+        result["Components"].push_back(component);
+    }
+
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
 
@@ -270,11 +312,18 @@ std::string jsonToCmds(const std::string& jsonString) {
     std::string cmds = "";
 
     // 遍历行为数组并生成指令
-    for (const auto& behavior : j["Components"][0]["Behavior"]) {
-        if (!cmds.empty()) {
-            cmds += ",";
+    for(const auto& component: j["Components"]){
+        if(!cmds.empty()){
+            cmds += "&";
         }
-        cmds += generateCmd(behavior);
+        std::string cmd = "";
+        for (const auto& behavior : component["Behavior"]) {
+            if (!cmd.empty()) {
+                cmd += ",";
+            }
+            cmd += generateCmd(behavior);
+        }
+        cmds += cmd;
     }
 
     return cmds;
@@ -290,33 +339,27 @@ void initializeArmConfigs() {
     // 初始化示例数据
     armConfigs[1] = {
         {"BasePosition", {0, 0, 0}},
-        {"Obstacles", {{{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}}}
+        {"Obstacles", {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}}
     };
     armConfigs[2] = {
         {"BasePosition", {420, 230, 0}},
-        {"Obstacles", {{{"X", {50, 100, 150}}, {"Radius", 20}}}}
+        {"Obstacles", {{"X", {50, 100, 150}}, {"Radius", 20}}}
     };
     armConfigs[3] = {
         {"BasePosition", {800, 230, 0}},
-        {"Obstacles", {{{"X", {30, 60, 90}}, {"Radius", 10}}}}
+        {"Obstacles", {{"X", {30, 60, 90}}, {"Radius", 10}}}
     };
     armConfigs[4] = {
         {"BasePosition", {800, -230, 0}},
-        {"Obstacles", {
-        {{"X", {800, -55, 205}}, {"Radius", 10}}}}
+        {"Obstacles", 
+            {{"X", {800, -55, 205}}, {"Radius", 10}}
+        }
     };
     armConfigs[5] = {
-        {"BasePosition", {0, 0, 0}},
-        {"Obstacles", {{{"X", {0, 0, 0}}, {"Radius", 10}}}}
+        {"BasePosition", {1600, -230, 0}},
+        {"Obstacles", 
+            {{"X", {0, 0, 0}}, {"Radius", 10}}
+        }
     };
 }
 
-
-void basicArmInfo(json& result, int armindex){//basePosition and Obstacles
-    if (armConfigs.find(armindex) != armConfigs.end()) {
-        result["Components"][0]["BasePosition"] = armConfigs[armindex]["BasePosition"];
-        result["Obstacles"] = armConfigs[armindex]["Obstacles"];
-    } else {
-        cout << "Invalid arm index." << endl;
-    }
-}
