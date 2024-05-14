@@ -3,6 +3,8 @@
 
 using namespace std;
 
+const int genflag = 0;
+
 std::vector<double> locs;
 bool isincre = false;
 bool isangle = false;
@@ -15,13 +17,28 @@ int main(){
         return 1;
     }
 
-    while(true){
+    if(genflag){
         int client_fd = wait_for_connection(server_fd);
         if (client_fd < 0){
             return 1;
         }
         char buffer[4096] = {0};
         if(receive_message(client_fd, buffer, 4096)){//process
+            string cmd = buffer;
+            string jsonstr = transCmds2(cmd);
+            overwriteToFile(jsonstr, "Arm4.json");
+        }
+        close_connection(client_fd);
+    }
+
+    while(!genflag){
+        int client_fd = wait_for_connection(server_fd);
+        if (client_fd < 0){
+            return 1;
+        }
+        char buffer[4096] = {0};
+        if(receive_message(client_fd, buffer, 4096)){//process
+            auto starttime = timenow();
             string cmd = buffer;
             string jsonstr = transCmds(cmd);
             cout<<jsonstr<<endl;
@@ -41,7 +58,9 @@ int main(){
             else{//safe
                 send_message(client_fd, "OK");
             }
+            auto endtime = timenow();
             
+            cout<<"\n time = "<<endtime - starttime<<endl;
         }
         close_connection(client_fd);
     }
@@ -288,6 +307,39 @@ std::string transCmds(const std::string& packet) {
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
 
+std::string transCmds2(const std::string& packet) {
+    json result;
+    result["Obstacles"] = json::array();
+    result["Components"] = json::array();
+    // int index = 0;
+    std::string singleArm;
+    std::string strcopy = packet;//auto deep copy
+    std::size_t AndPos = strcopy.find('&');
+    while(AndPos != std::string::npos){
+        singleArm = strcopy.substr(0, AndPos);
+        singleArm = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + singleArm;
+        //func here
+        json component = parseComponent(singleArm, result);
+        if(component == NULL){//no behavior
+            return "";
+        }
+        result["Components"].push_back(component);
+        strcopy = strcopy.substr(AndPos + 1);
+        AndPos = strcopy.find('&');
+        // index++;
+    }
+    if(strcopy != ""){
+        strcopy = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + strcopy;
+        json component = parseComponent(strcopy, result);
+        if(component == NULL){//no behavior
+            return "";
+        }
+        result["Components"].push_back(component);
+    }
+
+    return result.dump(4);  // 输出格式化的 JSON 字符串
+}
+
 std::string generateCmd(const json& behavior) {
     std::string cmd = "M20 G90 "; // 假设都是绝对坐标系统
     cmd += behavior["Motion type"] == "Joint" ? "G00 " : "G01 ";
@@ -309,13 +361,17 @@ std::string generateCmd(const json& behavior) {
 
 std::string jsonToCmds(const std::string& jsonString) {
     json j = json::parse(jsonString);
-    std::string cmds = "";
+    std::string cmdsback = "";
+    std::vector<std::string> cmds;
+    cmds.resize(6);
+    for(int i = 0; i < 6; ++i){
+        cmds[i] = "";
+    }
 
-    // 遍历行为数组并生成指令
     for(const auto& component: j["Components"]){
-        if(!cmds.empty()){
-            cmds += "&";
-        }
+        // if(!cmds.empty()){
+        //     cmds += "&";
+        // }
         std::string cmd = "";
         for (const auto& behavior : component["Behavior"]) {
             if (!cmd.empty()) {
@@ -323,10 +379,24 @@ std::string jsonToCmds(const std::string& jsonString) {
             }
             cmd += generateCmd(behavior);
         }
-        cmds += cmd;
+        // cmds += cmd;
+        for (const auto& [key, value] : armConfigs) {
+            if (value["BasePosition"] == component["BasePosition"]) {
+                cmds[key] = cmd;
+            }
+        }
     }
 
-    return cmds;
+    for(int i = 0; i < 6; ++i){
+        if(cmds[i] != ""){
+            if(cmdsback != ""){
+                cmdsback += "&";
+            }
+            cmdsback += cmds[i];
+        }
+    }
+
+    return cmdsback;
 }
 
 std::string doubleToStr(double value) {
@@ -334,6 +404,30 @@ std::string doubleToStr(double value) {
     oss << std::fixed << std::setprecision(2) << value;
     return oss.str();
 }
+
+void overwriteToFile(const std::string& str, const std::string& filename) {
+    // 打开文件，使用 std::ios::out 模式以覆盖方式写入
+    std::ofstream file(filename, std::ios::out);
+    if (file.is_open()) {
+        // 写入字符串并添加换行符
+        file << str << '\n';
+        // 关闭文件
+        file.close();
+    } else {
+        // 文件打开失败，输出错误消息
+        std::cerr << "Unable to open file: " << filename << std::endl;
+    }
+}
+
+long long int timenow(){
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration_since_epoch = now.time_since_epoch();
+    long long int millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration_since_epoch).count();
+    return millis;
+}
+
+
+
 
 void initializeArmConfigs() {
     // 初始化示例数据
