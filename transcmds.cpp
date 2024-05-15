@@ -1,7 +1,9 @@
 #include "tcpdocker.h"
-#include "controller.hpp"
+#include "transcmds.hpp"
 
 using namespace std;
+
+const int genflag = 0;
 
 std::vector<double> locs;
 bool isincre = false;
@@ -10,51 +12,23 @@ map<int, json> armConfigs;
 
 int main(){
     initializeArmConfigs();
-    overwriteToFile("\n", "json/verify.json");
-    overwriteToFile("\n", "json/control.json");
-    int server_fd = setup_server(12345);
-    if (server_fd < 0){
-        return 1;
-    }
-
-    while(true){
-        int client_fd = wait_for_connection(server_fd);
-        if (client_fd < 0){
-            return 1;
-        }
-        char buffer[4096] = {0};
-        if(receive_message(client_fd, buffer, 4096)){//process
-            auto starttime = timenow();
-            string cmd = buffer;
-            string jsonstr = transCmds(cmd);
-            cout<<jsonstr<<endl;
-            appendToFile(jsonstr, "json/verify.json");
-            if(!jsonstr.empty() && !arm_verify(jsonstr)){
-                string controljsonstr;
-                string cmdsendback;
-                controljsonstr = arm_control(jsonstr);
-                cout<<"\ncontroljsonstr = "<<controljsonstr<<endl;
-                appendToFile(controljsonstr, "json/control.json");
-                if(!controljsonstr.empty()){
-                    cmdsendback = jsonToCmds(controljsonstr);
-                }
-                // cout<<"\ncmdsendback = "<<cmdsendback<<endl;
-                send_message(client_fd, cmdsendback.c_str());
-                
-            }
-            else{//safe
-                send_message(client_fd, "OK");
-            }
-            auto endtime = timenow();
-            
-            cout<<"\n time = "<<endtime - starttime<<endl;
-        }
-        close_connection(client_fd);
-    }
-    close_connection(server_fd);
-
+    string cmds = readFile("cmdsin.md");
+    cout<<"cmds = "<<cmds<<endl;
+    string jsonstr = transCmds2(cmds);
+    overwriteToFile(jsonstr, "Arm4.json");
+    cout<<"\nwrite trajectory json to file\n";
     return 0;
 }
+
+
+// void basicArmInfo(json& result, int armindex, int index){//basePosition and Obstacles
+//     if (armConfigs.find(armindex) != armConfigs.end()) {
+//         result["Components"][index]["BasePosition"] = armConfigs[armindex]["BasePosition"];
+//         result["Obstacles"].push_back(armConfigs[armindex]["Obstacles"]);
+//     } else {
+//         cout << "Invalid arm index." << endl;
+//     }
+// }
 
 json parseInitialState(const std::string& data) {
     std::istringstream iss(data);
@@ -428,20 +402,6 @@ long long int timenow(){
     return millis;
 }
 
-void appendToFile(const std::string& str, const std::string& filename) {
-    // 打开文件，使用 std::ios::app 模式以追加方式写入
-    std::ofstream file(filename, std::ios::app);
-    if (file.is_open()) {
-        // 写入字符串并添加换行符
-        file << str << endl;
-        // 关闭文件
-        file.close();
-    } else {
-        // 文件打开失败，输出错误消息
-        std::cerr << "Unable to open file: " << filename << std::endl;
-    }
-}
-
 
 
 
@@ -449,30 +409,15 @@ void initializeArmConfigs() {
     // 初始化示例数据
     armConfigs[1] = {
         {"BasePosition", {0, 0, 0}},
-        {"Obstacles", 
-            {
-                {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}
-        
-            }
-        }
+        {"Obstacles", {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}}
     };
     armConfigs[2] = {
         {"BasePosition", {420, 230, 0}},
-        {"Obstacles", 
-            {
-                {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}
-        
-            }
-        }
+        {"Obstacles", {{"X", {50, 100, 150}}, {"Radius", 20}}}
     };
     armConfigs[3] = {
         {"BasePosition", {800, 230, 0}},
-        {"Obstacles", 
-            {
-                {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}
-        
-            }
-        }
+        {"Obstacles", {{"X", {30, 60, 90}}, {"Radius", 10}}}
     };
     armConfigs[4] = {
         {"BasePosition", {800, -230, 0}},
@@ -487,10 +432,7 @@ void initializeArmConfigs() {
     armConfigs[5] = {
         {"BasePosition", {1600, -230, 0}},
         {"Obstacles", 
-            {
-                {{"X", {0, 0, 0}}, {"Radius", 10}}
-            
-            }
+            {{"X", {0, 0, 0}}, {"Radius", 10}}
         }
     };
 }

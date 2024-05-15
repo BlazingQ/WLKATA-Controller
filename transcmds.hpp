@@ -17,8 +17,6 @@ std::string generateCmd(const json& behavior);
 std::string jsonToCmds(const std::string& jsonString);
 std::string doubleToStr(double value);
 void overwriteToFile(const std::string& str, const std::string& filename);
-void appendToFile(const std::string& str, const std::string& filename);
 std::string readFile(const std::string& filename);
 long long int timenow();
 void initializeArmConfigs();
-// void basicArmInfo(json& result, int armindex);
