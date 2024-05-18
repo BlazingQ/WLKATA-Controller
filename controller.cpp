@@ -12,6 +12,7 @@ int main(){
     initializeArmConfigs();
     overwriteToFile("\n", "json/verify.json");
     overwriteToFile("\n", "json/control.json");
+    overwriteToFile("\n", "json/status.json");
     int server_fd = setup_server(12345);
     if (server_fd < 0){
         return 1;
@@ -25,8 +26,9 @@ int main(){
         char buffer[4096] = {0};
         if(receive_message(client_fd, buffer, 4096)){//process
             auto starttime = timenow();
-            string cmd = buffer;
-            string jsonstr = transCmds(cmd);
+            string status = buffer;
+            appendToFile(status, "json/status.json");
+            string jsonstr = transCmds(status);
             cout<<jsonstr<<endl;
             appendToFile(jsonstr, "json/verify.json");
             if(!jsonstr.empty() && !arm_verify(jsonstr)){
@@ -205,21 +207,16 @@ json parseCommand(const std::string& cmd) {
     return behavior;
 }
 
-json parseComponent(std::string singleArm, json& result){
+json parseComponent(json singleArm, json& result){
     json component;
-    std::size_t delimiterPos = singleArm.find(';');
-    std::size_t delimiterRPos = singleArm.rfind(';');
-    int armindex = std::stoi(singleArm.substr(0, delimiterPos));
-    std::string initialStateData = singleArm.substr(delimiterPos + 1, delimiterRPos - delimiterPos - 1);
-    std::string commands = singleArm.substr(delimiterRPos + 1);
-    // result["Components"] = json::array({
-    //     {
-    //         {"BasePosition", {0, 0, 0}},
-    //         {"InitialState", parseInitialState(initialStateData)},
-    //         {"Behavior", json::array()}
-    //     }
-    // });
-    // basicArmInfo(result, armindex);
+    int armindex = singleArm["ArmId"];
+    string initialStateData = singleArm["Locs"];
+    string commands = singleArm["Cmds"];
+    // std::size_t delimiterPos = singleArm.find(';');
+    // std::size_t delimiterRPos = singleArm.rfind(';');
+    // int armindex = std::stoi(singleArm.substr(0, delimiterPos));
+    // std::string initialStateData = singleArm.substr(delimiterPos + 1, delimiterRPos - delimiterPos - 1);
+    // std::string commands = singleArm.substr(delimiterRPos + 1);
     if (armConfigs.find(armindex) != armConfigs.end()) {
         component["BasePosition"] = armConfigs[armindex]["BasePosition"];
         for (const auto& obstacle : armConfigs[armindex]["Obstacles"]) {
@@ -256,69 +253,70 @@ json parseComponent(std::string singleArm, json& result){
 }
 
 // 主函数，处理整个指令字符串
-std::string transCmds(const std::string& packet) {
+std::string transCmds(const std::string& status) {
+    json arms = json::parse(status);
     json result;
     result["Obstacles"] = json::array();
     result["Components"] = json::array();
     // int index = 0;
-    std::string singleArm;
-    std::string strcopy = packet;//auto deep copy
-    std::size_t AndPos = strcopy.find('&');
-    while(AndPos != std::string::npos){
-        singleArm = strcopy.substr(0, AndPos);
-        //func here
-        json component = parseComponent(singleArm, result);
+    // std::string singleArm;
+    // std::string strcopy = packet;//auto deep copy
+    // std::size_t AndPos = strcopy.find('&');
+    // while(AndPos != std::string::npos){
+    //     singleArm = strcopy.substr(0, AndPos);
+    for(json arm: arms){
+        json component = parseComponent(arm, result);
         if(component == NULL){//no behavior
             return "";
         }
         result["Components"].push_back(component);
-        strcopy = strcopy.substr(AndPos + 1);
-        AndPos = strcopy.find('&');
+        // strcopy = strcopy.substr(AndPos + 1);
+        // AndPos = strcopy.find('&');
         // index++;
     }
-    if(strcopy != ""){
-        json component = parseComponent(strcopy, result);
-        if(component == NULL){//no behavior
-            return "";
-        }
-        result["Components"].push_back(component);
-    }
+    // if(strcopy != ""){
+    //     json component = parseComponent(strcopy, result);
+    //     if(component == NULL){//no behavior
+    //         return "";
+    //     }
+    //     result["Components"].push_back(component);
+    // }
 
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
 
-std::string transCmds2(const std::string& packet) {
-    json result;
-    result["Obstacles"] = json::array();
-    result["Components"] = json::array();
-    // int index = 0;
-    std::string singleArm;
-    std::string strcopy = packet;//auto deep copy
-    std::size_t AndPos = strcopy.find('&');
-    while(AndPos != std::string::npos){
-        singleArm = strcopy.substr(0, AndPos);
-        singleArm = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + singleArm;
-        //func here
-        json component = parseComponent(singleArm, result);
-        if(component == NULL){//no behavior
-            return "";
-        }
-        result["Components"].push_back(component);
-        strcopy = strcopy.substr(AndPos + 1);
-        AndPos = strcopy.find('&');
-        // index++;
-    }
-    if(strcopy != ""){
-        strcopy = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + strcopy;
-        json component = parseComponent(strcopy, result);
-        if(component == NULL){//no behavior
-            return "";
-        }
-        result["Components"].push_back(component);
-    }
+// std::string transCmds2(const std::string& packet) {
+//     json result;
+//     result["Obstacles"] = json::array();
+//     result["Components"] = json::array();
+//     // int index = 0;
+//     std::string singleArm;
+//     std::string strcopy = packet;//auto deep copy
+//     std::size_t AndPos = strcopy.find('&');
+//     while(AndPos != std::string::npos){
+//         singleArm = strcopy.substr(0, AndPos);
+//         singleArm = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + singleArm;
+//         //func here
+//         json component = parseComponent(singleArm, result);
+//         if(component == NULL){//no behavior
+//             return "";
+//         }
+//         result["Components"].push_back(component);
+//         strcopy = strcopy.substr(AndPos + 1);
+//         AndPos = strcopy.find('&');
+//         // index++;
+//     }
+//     if(strcopy != ""){
+//         strcopy = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + strcopy;
+//         json component = parseComponent(strcopy, result);
+//         if(component == NULL){//no behavior
+//             return "";
+//         }
+//         result["Components"].push_back(component);
+//     }
 
-    return result.dump(4);  // 输出格式化的 JSON 字符串
-}
+//     return result.dump(4);  // 输出格式化的 JSON 字符串
+// }
 
 std::string generateCmd(const json& behavior) {
     std::string cmd = "M20 G90 "; // 假设都是绝对坐标系统

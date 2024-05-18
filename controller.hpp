@@ -12,7 +12,7 @@ json parseInitialState(const std::string& data);
 json parseComponent(std::string singleArm, json& result);
 json parseCommand(const std::string& cmd);
 std::string transCmds(const std::string& cmd);
-std::string transCmds2(const std::string& cmd);
+// std::string transCmds2(const std::string& cmd);
 std::string generateCmd(const json& behavior);
 std::string jsonToCmds(const std::string& jsonString);
 std::string doubleToStr(double value);
