@@ -2,9 +2,9 @@
 *.txt
 .gitmodules
 controller
-transcmds
+transcmds*
 *.json
-cmdsin.md
+*.md
 # Created by https://www.toptal.com/developers/gitignore/api/c++,c
 # Edit at https://www.toptal.com/developers/gitignore?templates=c++,c
 

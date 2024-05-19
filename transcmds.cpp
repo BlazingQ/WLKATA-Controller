@@ -15,7 +15,7 @@ int main(){
     string cmds = readFile("cmdsin.md");
     cout<<"cmds = "<<cmds<<endl;
     string jsonstr = transCmds2(cmds);
-    overwriteToFile(jsonstr, "Arm4.json");
+    overwriteToFile(jsonstr, "Arm3.json");
     cout<<"\nwrite trajectory json to file\n";
     return 0;
 }
@@ -271,7 +271,7 @@ std::string transCmds2(const std::string& packet) {
     std::size_t AndPos = strcopy.find('&');
     while(AndPos != std::string::npos){
         singleArm = strcopy.substr(0, AndPos);
-        singleArm = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + singleArm;
+        singleArm = "3;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + singleArm;
         //func here
         json component = parseComponent(singleArm, result);
         if(component == NULL){//no behavior
@@ -283,7 +283,7 @@ std::string transCmds2(const std::string& packet) {
         // index++;
     }
     if(strcopy != ""){
-        strcopy = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + strcopy;
+        strcopy = "3;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + strcopy;
         json component = parseComponent(strcopy, result);
         if(component == NULL){//no behavior
             return "";
@@ -417,14 +417,15 @@ void initializeArmConfigs() {
     };
     armConfigs[3] = {
         {"BasePosition", {800, 230, 0}},
-        {"Obstacles", {{"X", {30, 60, 90}}, {"Radius", 10}}}
+        {"Obstacles", {
+
+        }}
     };
     armConfigs[4] = {
         {"BasePosition", {800, -230, 0}},
         {"Obstacles", 
             {
-                {{"X", {800, -55, 205}}, {"Radius", 10}},
-                {{"X", {900, -140, 200}}, {"Radius", 10}}
+                
             }
         }
     };
@@ -432,7 +433,9 @@ void initializeArmConfigs() {
     armConfigs[5] = {
         {"BasePosition", {1600, -230, 0}},
         {"Obstacles", 
-            {{"X", {0, 0, 0}}, {"Radius", 10}}
+            {
+                {{"X", {0, 0, 0}}, {"Radius", 10}}
+            }
         }
     };
 }

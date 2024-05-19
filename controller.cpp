@@ -32,6 +32,7 @@ int main(){
             cout<<jsonstr<<endl;
             appendToFile(jsonstr, "json/verify.json");
             if(!jsonstr.empty() && !arm_verify(jsonstr)){
+            // if(!jsonstr.empty() && ){
                 string controljsonstr;
                 string cmdsendback;
                 controljsonstr = arm_control(jsonstr);
@@ -50,6 +51,7 @@ int main(){
             auto endtime = timenow();
             
             cout<<"\n time = "<<endtime - starttime<<endl;
+            appendToFile(to_string(endtime - starttime), "timeused.md");
         }
         close_connection(client_fd);
     }
@@ -467,7 +469,6 @@ void initializeArmConfigs() {
         {"BasePosition", {800, 230, 0}},
         {"Obstacles", 
             {
-                {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}
         
             }
         }
@@ -476,11 +477,11 @@ void initializeArmConfigs() {
         {"BasePosition", {800, -230, 0}},
         {"Obstacles", 
             {
-                {{"X", {800, -55, 205}}, {"Radius", 10}},
-                {{"X", {900, -140, 200}}, {"Radius", 10}}
+                
             }
         }
     };
+    
     //25传送带
     armConfigs[5] = {
         {"BasePosition", {1600, -230, 0}},
