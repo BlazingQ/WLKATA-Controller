@@ -24,42 +24,49 @@ int main(){
             return 1;
         }
         char buffer[4096] = {0};
-        if(receive_message(client_fd, buffer, 4096)){//process
-            auto starttime = timenow();
-            string status = buffer;
-            appendToFile(status, "json/status.json");
-            string jsonstr = transCmds(status);
-            cout<<jsonstr<<endl;
-            appendToFile(jsonstr, "json/verify.json");
-            if(!jsonstr.empty() && !arm_verify(jsonstr)){
-            // if(!jsonstr.empty() && ){
-                string controljsonstr;
-                string cmdsendback;
-                controljsonstr = arm_control(jsonstr);
-                cout<<"\ncontroljsonstr = "<<controljsonstr<<endl;
-                appendToFile(controljsonstr, "json/control.json");
-                if(!controljsonstr.empty()){
-                    cmdsendback = jsonToCmds(controljsonstr);
-                }
-                // cout<<"\ncmdsendback = "<<cmdsendback<<endl;
-                send_message(client_fd, cmdsendback.c_str());
-                
-            }
-            else{//safe
-                send_message(client_fd, "OK");
-            }
-            auto endtime = timenow();
-            
-            cout<<"\n time = "<<endtime - starttime<<endl;
-            appendToFile(to_string(endtime - starttime), "timeused.md");
+        if(receive_message(client_fd, buffer, 4096)){//receive msg will print buffer
+            string str = buffer; 
+            str = str + "+222";
+            send_message(client_fd, str.c_str());
         }
         close_connection(client_fd);
+        // if(receive_message(client_fd, buffer, 4096)){//process
+        //     auto starttime = timenow();
+        //     string status = buffer;
+        //     appendToFile(status, "json/status.json");
+        //     string jsonstr = transCmds(status);
+        //     cout<<jsonstr<<endl;
+        //     appendToFile(jsonstr, "json/verify.json");
+        //     if(!jsonstr.empty() && !arm_verify(jsonstr)){
+        //     // if(!jsonstr.empty() && ){
+        //         string controljsonstr;
+        //         string cmdsendback;
+        //         controljsonstr = arm_control(jsonstr);
+        //         cout<<"\ncontroljsonstr = "<<controljsonstr<<endl;
+        //         appendToFile(controljsonstr, "json/control.json");
+        //         if(!controljsonstr.empty()){
+        //             cmdsendback = jsonToCmds(controljsonstr);
+        //         }
+        //         // cout<<"\ncmdsendback = "<<cmdsendback<<endl;
+        //         send_message(client_fd, cmdsendback.c_str());
+                
+        //     }
+        //     else{//safe
+        //         send_message(client_fd, "OK");
+        //     }
+        //     auto endtime = timenow();
+            
+        //     cout<<"\n time = "<<endtime - starttime<<endl;
+        //     appendToFile(to_string(endtime - starttime), "timeused.md");
+        // }
+        // close_connection(client_fd);
     }
     close_connection(server_fd);
 
     return 0;
 }
 
+/*根据传来的locs信息确定起始位置*/
 json parseInitialState(const std::string& data) {
     std::istringstream iss(data);
     std::string value;
@@ -77,6 +84,8 @@ json parseInitialState(const std::string& data) {
     return initialState;
 }
 
+/*几乎是硬编码做的指令解析，不过由于本身指令解析不是实验重点，
+也没必要用更复杂的方法*/
 json parseCommand(const std::string& cmd) {
     std::istringstream iss(cmd);
     std::string part;
@@ -209,6 +218,8 @@ json parseCommand(const std::string& cmd) {
     return behavior;
 }
 
+/*解析从客户端传来的当前状态，根据armId和服务器端的arm基准位置坐标可以
+获取全局位置坐标，其他信息全部由客户端提供。 */
 json parseComponent(json singleArm, json& result){
     json component;
     int armindex = singleArm["ArmId"];
@@ -287,39 +298,6 @@ std::string transCmds(const std::string& status) {
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
 
-// std::string transCmds2(const std::string& packet) {
-//     json result;
-//     result["Obstacles"] = json::array();
-//     result["Components"] = json::array();
-//     // int index = 0;
-//     std::string singleArm;
-//     std::string strcopy = packet;//auto deep copy
-//     std::size_t AndPos = strcopy.find('&');
-//     while(AndPos != std::string::npos){
-//         singleArm = strcopy.substr(0, AndPos);
-//         singleArm = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + singleArm;
-//         //func here
-//         json component = parseComponent(singleArm, result);
-//         if(component == NULL){//no behavior
-//             return "";
-//         }
-//         result["Components"].push_back(component);
-//         strcopy = strcopy.substr(AndPos + 1);
-//         AndPos = strcopy.find('&');
-//         // index++;
-//     }
-//     if(strcopy != ""){
-//         strcopy = "4;183.669998,0.000000,230.000000,0.000000,0.000000,0.000000;" + strcopy;
-//         json component = parseComponent(strcopy, result);
-//         if(component == NULL){//no behavior
-//             return "";
-//         }
-//         result["Components"].push_back(component);
-//     }
-
-//     return result.dump(4);  // 输出格式化的 JSON 字符串
-// }
-
 std::string generateCmd(const json& behavior) {
     std::string cmd = "M20 G90 "; // 假设都是绝对坐标系统
     cmd += behavior["Motion type"] == "Joint" ? "G00 " : "G01 ";
@@ -339,6 +317,9 @@ std::string generateCmd(const json& behavior) {
     return cmd;
 }
 
+/*根据验证与控制生成的结果，将其重新封装为返回的cmd串。
+目前的格式不太美妙，可以继续设计，返回的串的格式很机械，
+就是按armId的顺序排的*/
 std::string jsonToCmds(const std::string& jsonString) {
     json j = json::parse(jsonString);
     std::string cmdsback = "";
@@ -448,7 +429,7 @@ void appendToFile(const std::string& str, const std::string& filename) {
 void initializeArmConfigs() {
     // 初始化示例数据
     armConfigs[1] = {
-        {"BasePosition", {0, 0, 0}},
+        {"BasePosition", {0, 230, 0}},
         {"Obstacles", 
             {
                 {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}
