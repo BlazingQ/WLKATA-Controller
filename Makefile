@@ -11,7 +11,7 @@ LDFLAGS=-L./arm_converter/lib -L./arm_controller/lib -lverifier -lbach -fopenmp 
 TARGET=controller
 
 # 项目中所有相关的源文件
-SRC=controller.cpp tcpdocker.cpp
+SRC=main.cpp ArmControllerServer.cpp tcpdocker.cpp
 
 # 对应的源文件生成的目标文件列表
 OBJ=$(SRC:.cpp=.o)

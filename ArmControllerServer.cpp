@@ -1,73 +1,59 @@
-#include "tcpdocker.h"
-#include "controller.hpp"
+#include "ArmControllerServer.hpp"
 
-using namespace std;
-
-std::vector<double> locs;
-bool isincre = false;
-bool isangle = false;
-map<int, json> armConfigs;
-
-int main(){
+ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
     initializeArmConfigs();
+}
+
+void ArmControllerServer::runServer(int port) {
     overwriteToFile("\n", "json/verify.json");
     overwriteToFile("\n", "json/control.json");
     overwriteToFile("\n", "json/status.json");
-    int server_fd = setup_server(12345);
-    if (server_fd < 0){
-        return 1;
+
+    int server_fd = setup_server(port);
+    if (server_fd < 0) {
+        std::cerr << "Failed to set up server." << std::endl;
+        return;
     }
 
-    while(true){
+    while (true) {
         int client_fd = wait_for_connection(server_fd);
-        if (client_fd < 0){
-            return 1;
+        if (client_fd < 0) {
+            std::cerr << "Failed to accept connection." << std::endl;
+            continue;
         }
-        char buffer[4096] = {0};
-        if(receive_message(client_fd, buffer, 4096)){//receive msg will print buffer
-            string str = buffer; 
-            str = str + "+222";
-            send_message(client_fd, str.c_str());
-        }
-        close_connection(client_fd);
-        // if(receive_message(client_fd, buffer, 4096)){//process
-        //     auto starttime = timenow();
-        //     string status = buffer;
-        //     appendToFile(status, "json/status.json");
-        //     string jsonstr = transCmds(status);
-        //     cout<<jsonstr<<endl;
-        //     appendToFile(jsonstr, "json/verify.json");
-        //     if(!jsonstr.empty() && !arm_verify(jsonstr)){
-        //     // if(!jsonstr.empty() && ){
-        //         string controljsonstr;
-        //         string cmdsendback;
-        //         controljsonstr = arm_control(jsonstr);
-        //         cout<<"\ncontroljsonstr = "<<controljsonstr<<endl;
-        //         appendToFile(controljsonstr, "json/control.json");
-        //         if(!controljsonstr.empty()){
-        //             cmdsendback = jsonToCmds(controljsonstr);
-        //         }
-        //         // cout<<"\ncmdsendback = "<<cmdsendback<<endl;
-        //         send_message(client_fd, cmdsendback.c_str());
-                
-        //     }
-        //     else{//safe
-        //         send_message(client_fd, "OK");
-        //     }
-        //     auto endtime = timenow();
-            
-        //     cout<<"\n time = "<<endtime - starttime<<endl;
-        //     appendToFile(to_string(endtime - starttime), "timeused.md");
-        // }
-        // close_connection(client_fd);
-    }
-    close_connection(server_fd);
 
-    return 0;
+        char buffer[4096] = {0};
+        if (receive_message(client_fd, buffer, 4096)) {
+            auto starttime = timenow();
+            std::string status = buffer;
+
+            appendToFile(status, "json/status.json");
+
+            std::string jsonstr = transCmds(status); // 调用命令处理函数
+            if (!jsonstr.empty() && !arm_verify(jsonstr)) {
+                std::string controljsonstr = arm_control(jsonstr);
+                appendToFile(controljsonstr, "json/control.json");
+
+                if (!controljsonstr.empty()) {
+                    std::string cmdsendback = jsonToCmds(controljsonstr);
+                    send_message(client_fd, cmdsendback.c_str());
+                }
+            } else {
+                send_message(client_fd, "OK");
+            }
+
+            auto endtime = timenow();
+            appendToFile(std::to_string(endtime - starttime), "timeused.md");
+        }
+
+        close_connection(client_fd);
+    }
+
+    close_connection(server_fd);
 }
 
 /*根据传来的locs信息确定起始位置*/
-json parseInitialState(const std::string& data) {
+json ArmControllerServer::parseInitialState(const std::string& data) {
     std::istringstream iss(data);
     std::string value;
     locs.clear();
@@ -86,7 +72,7 @@ json parseInitialState(const std::string& data) {
 
 /*几乎是硬编码做的指令解析，不过由于本身指令解析不是实验重点，
 也没必要用更复杂的方法*/
-json parseCommand(const std::string& cmd) {
+json ArmControllerServer::parseCommand(const std::string& cmd) {
     std::istringstream iss(cmd);
     std::string part;
     json behavior;
@@ -220,11 +206,11 @@ json parseCommand(const std::string& cmd) {
 
 /*解析从客户端传来的当前状态，根据armId和服务器端的arm基准位置坐标可以
 获取全局位置坐标，其他信息全部由客户端提供。 */
-json parseComponent(json singleArm, json& result){
+json ArmControllerServer::parseComponent(const json& singleArm, json& result){
     json component;
     int armindex = singleArm["ArmId"];
-    string initialStateData = singleArm["Locs"];
-    string commands = singleArm["Cmds"];
+    std::string initialStateData = singleArm["Locs"];
+    std::string commands = singleArm["Cmds"];
     // std::size_t delimiterPos = singleArm.find(';');
     // std::size_t delimiterRPos = singleArm.rfind(';');
     // int armindex = std::stoi(singleArm.substr(0, delimiterPos));
@@ -237,7 +223,7 @@ json parseComponent(json singleArm, json& result){
             }
         // result["Obstacles"].push_back(armConfigs[armindex]["Obstacles"]);
     } else {
-        cout << "Invalid arm index." << endl;
+        std::cout << "Invalid arm index." << std::endl;
     }
     component["InitialState"] = parseInitialState(initialStateData);
     component["Behavior"] = json::array();
@@ -266,7 +252,7 @@ json parseComponent(json singleArm, json& result){
 }
 
 // 主函数，处理整个指令字符串
-std::string transCmds(const std::string& status) {
+std::string ArmControllerServer::transCmds(const std::string& status) {
     json arms = json::parse(status);
     json result;
     result["Obstacles"] = json::array();
@@ -298,7 +284,7 @@ std::string transCmds(const std::string& status) {
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
 
-std::string generateCmd(const json& behavior) {
+std::string ArmControllerServer::generateCmd(const json& behavior) {
     std::string cmd = "M20 G90 "; // 假设都是绝对坐标系统
     cmd += behavior["Motion type"] == "Joint" ? "G00 " : "G01 ";
 
@@ -320,7 +306,7 @@ std::string generateCmd(const json& behavior) {
 /*根据验证与控制生成的结果，将其重新封装为返回的cmd串。
 目前的格式不太美妙，可以继续设计，返回的串的格式很机械，
 就是按armId的顺序排的*/
-std::string jsonToCmds(const std::string& jsonString) {
+std::string ArmControllerServer::jsonToCmds(const std::string& jsonString) {
     json j = json::parse(jsonString);
     std::string cmdsback = "";
     std::vector<std::string> cmds;
@@ -414,7 +400,7 @@ void appendToFile(const std::string& str, const std::string& filename) {
     std::ofstream file(filename, std::ios::app);
     if (file.is_open()) {
         // 写入字符串并添加换行符
-        file << str << endl;
+        file << str << std::endl;
         // 关闭文件
         file.close();
     } else {
@@ -424,9 +410,7 @@ void appendToFile(const std::string& str, const std::string& filename) {
 }
 
 
-
-
-void initializeArmConfigs() {
+void ArmControllerServer::initializeArmConfigs() {
     // 初始化示例数据
     armConfigs[1] = {
         {"BasePosition", {0, 230, 0}},
