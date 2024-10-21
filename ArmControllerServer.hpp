@@ -41,8 +41,8 @@ public:
 std::string doubleToStr(double value);
 void overwriteToFile(const std::string& str, const std::string& filename);
 std::string readFile(const std::string& filename);
-long long int timenow();
 void appendToFile(const std::string& str, const std::string& filename);
+long long int timenow();
 
 
 #endif

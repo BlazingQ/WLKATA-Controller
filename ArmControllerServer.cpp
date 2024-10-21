@@ -30,17 +30,20 @@ void ArmControllerServer::runServer(int port) {
             appendToFile(status, "json/status.json");
 
             std::string jsonstr = transCmds(status); // 调用命令处理函数
-            if (!jsonstr.empty() && !arm_verify(jsonstr)) {
-                std::string controljsonstr = arm_control(jsonstr);
-                appendToFile(controljsonstr, "json/control.json");
-
-                if (!controljsonstr.empty()) {
-                    std::string cmdsendback = jsonToCmds(controljsonstr);
-                    send_message(client_fd, cmdsendback.c_str());
-                }
-            } else {
-                send_message(client_fd, "OK");
+            if(!jsonstr.empty()){
+                arm_verify(jsonstr);
             }
+            // if (!jsonstr.empty() && !arm_verify(jsonstr)) {
+            //     std::string controljsonstr = arm_control(jsonstr);
+            //     appendToFile(controljsonstr, "json/control.json");
+
+            //     if (!controljsonstr.empty()) {
+            //         std::string cmdsendback = jsonToCmds(controljsonstr);
+            //         send_message(client_fd, cmdsendback.c_str());
+            //     }
+            // } else {
+            //     send_message(client_fd, "OK");
+            // }
 
             auto endtime = timenow();
             appendToFile(std::to_string(endtime - starttime), "timeused.md");
@@ -190,12 +193,6 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
                 
             }
         } 
-        // else if (part[0] == 'A' || part[0] == 'B' || part[0] == 'C') {
-        //     std::size_t pos = part.find_first_not_of("ABC");
-        //     if (pos != std::string::npos) {
-        //         behavior["R"].push_back(std::stod(part.substr(pos)));
-        //     }
-        // }
     }
 
     // Speed is fixed as 2000
@@ -211,17 +208,11 @@ json ArmControllerServer::parseComponent(const json& singleArm, json& result){
     int armindex = singleArm["ArmId"];
     std::string initialStateData = singleArm["Locs"];
     std::string commands = singleArm["Cmds"];
-    // std::size_t delimiterPos = singleArm.find(';');
-    // std::size_t delimiterRPos = singleArm.rfind(';');
-    // int armindex = std::stoi(singleArm.substr(0, delimiterPos));
-    // std::string initialStateData = singleArm.substr(delimiterPos + 1, delimiterRPos - delimiterPos - 1);
-    // std::string commands = singleArm.substr(delimiterRPos + 1);
     if (armConfigs.find(armindex) != armConfigs.end()) {
         component["BasePosition"] = armConfigs[armindex]["BasePosition"];
         for (const auto& obstacle : armConfigs[armindex]["Obstacles"]) {
                 result["Obstacles"].push_back(obstacle); // 逐个添加
             }
-        // result["Obstacles"].push_back(armConfigs[armindex]["Obstacles"]);
     } else {
         std::cout << "Invalid arm index." << std::endl;
     }
@@ -253,33 +244,20 @@ json ArmControllerServer::parseComponent(const json& singleArm, json& result){
 
 // 主函数，处理整个指令字符串
 std::string ArmControllerServer::transCmds(const std::string& status) {
-    json arms = json::parse(status);
+    json statusjson = json::parse(status);
+    int armid = statusjson["armid"];
+    json arms = statusjson["Arms"];
     json result;
     result["Obstacles"] = json::array();
     result["Components"] = json::array();
-    // int index = 0;
-    // std::string singleArm;
-    // std::string strcopy = packet;//auto deep copy
-    // std::size_t AndPos = strcopy.find('&');
-    // while(AndPos != std::string::npos){
-    //     singleArm = strcopy.substr(0, AndPos);
+
     for(json arm: arms){
         json component = parseComponent(arm, result);
         if(component == NULL){//no behavior
             return "";
         }
         result["Components"].push_back(component);
-        // strcopy = strcopy.substr(AndPos + 1);
-        // AndPos = strcopy.find('&');
-        // index++;
     }
-    // if(strcopy != ""){
-    //     json component = parseComponent(strcopy, result);
-    //     if(component == NULL){//no behavior
-    //         return "";
-    //     }
-    //     result["Components"].push_back(component);
-    // }
 
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
@@ -316,9 +294,6 @@ std::string ArmControllerServer::jsonToCmds(const std::string& jsonString) {
     }
 
     for(const auto& component: j["Components"]){
-        // if(!cmds.empty()){
-        //     cmds += "&";
-        // }
         std::string cmd = "";
         for (const auto& behavior : component["Behavior"]) {
             if (!cmd.empty()) {
@@ -326,7 +301,6 @@ std::string ArmControllerServer::jsonToCmds(const std::string& jsonString) {
             }
             cmd += generateCmd(behavior);
         }
-        // cmds += cmd;
         for (const auto& [key, value] : armConfigs) {
             if (value["BasePosition"] == component["BasePosition"]) {
                 cmds[key] = cmd;

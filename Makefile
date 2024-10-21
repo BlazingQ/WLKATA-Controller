@@ -5,7 +5,9 @@ CC=g++
 CFLAGS=-g -Wall
 
 # 链接器标志，指定要链接的库文件
-LDFLAGS=-L./arm_converter/lib -L./arm_controller/lib -lverifier -lbach -fopenmp -lstdc++ -lz3 -lmathsat -lgmp -lcryptominisat5 -lcadical -lcontroller
+LDFLAGS=-L./arm_converter/lib -L./arm_controller/lib \
+        -Wl,-rpath=\$$ORIGIN/arm_converter/lib -Wl,-rpath=\$$ORIGIN/arm_controller/lib \
+        -lverifier -lbach -fopenmp -lstdc++ -lz3 -lmathsat -lgmp -lcryptominisat5 -lcadical -lcontroller 
 
 # 目标可执行文件名
 TARGET=controller
