@@ -8,50 +8,56 @@
 #include <sstream>
 #include <map>
 #include <unordered_map>
+#include <climits>
+#include <algorithm>
 // #include <variant>
+
 #include "nlohmann/json.hpp"
 #include "tcpdocker.h"
 #include "arm_converter/armVerifier.hpp"
 #include "arm_controller/armController.hpp"
 
 using json = nlohmann::json;
-// using VariantType = std::variant<int, double, bool, std::string>;
+using namespace std;
+// using VariantType = variant<int, double, bool, string>;
 
 class ArmControllerServer {
 private:
-    std::map<int, json> armConfigs;
-    std::vector<double> locs;
+    map<int, json> armConfigs;
+    vector<double> locs;
     bool isincre;
     bool isangle;
 
     // 私有成员函数
-    json preprocessStateJson(json statusstr);
-    std::pair<std::pair<int, int>, json> getExecTime(json& j, int cmdId);
-    json parseInitialState(const std::string& data);
-    json parseCommand(const std::string& cmd);
+    json preprocessStateJson(string statusstr);
+    pair<pair<int, int>, json> getVrfArmInfo(json armjson, int vrfid);
+    pair<int, json> getOtherArmInfo(json armjson, pair<int, int> timepair, int delay);
+    json parseInitialState(const string& data);
+    json parseCommand(const string& cmd);
     json parseComponent(const json& singleArm, json& result);
-    std::string transCmds(json arms);
-    std::string generateCmd(const json& behavior);
-    std::string jsonToCmds(const std::string& jsonString);
-    std::string verifyMsg(const int armid, const int cmdid, const int vrfres);
+    string transCmds(json arms);
+    string generateCmd(const json& behavior);
+    string jsonToCmds(const string& jsonString);
+    string verifyMsg(const int armid, const int cmdid, const int vrfres);
     void initializeArmConfigs();
-    void updateLocs(std::string cmd, float locs[]);
+    void updateLocs(string cmd, float locs[]);
 
 public:
     ArmControllerServer();
     void runServer(int port);
 };
 
-std::string doubleToStr(double value);
-void overwriteToFile(const std::string& str, const std::string& filename);
-std::string readFile(const std::string& filename);
-void appendToFile(const std::string& str, const std::string& filename);
+string doubleToStr(double value);
+void overwriteToFile(const string& str, const string& filename);
+string readFile(const string& filename);
+void appendToFile(const string& str, const string& filename);
 long long int timenow();
-std::vector<std::string> decodeCommaStr(const std::string& commands, int startIndex, int length);
-std::string subCommaStr(const std::string& commands, int startIndex, int length);
-std::string encodeCommaStr(std::string commandArray[], int arraysize, int startIndex, int length);
-json unordered_map_to_json(const std::unordered_map<std::string, std::string>& umap);
-std::unordered_map<std::string, std::string> json_to_unordered_map(const json& j);
+vector<string> decodeCommaStr(const string& commands, int startIndex, int length);
+vector<int> commaStrtoInt(const string& commands, int startIndex, int length);
+string subCommaStr(const string& commands, int startIndex, int length);
+string encodeCommaStr(string commandArray[], int arraysize, int startIndex, int length);
+json unordered_map_to_json(const unordered_map<string, string>& umap);
+unordered_map<string, string> json_to_unordered_map(const json& j);
 
 
 

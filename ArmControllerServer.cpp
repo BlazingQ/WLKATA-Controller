@@ -11,21 +11,21 @@ void ArmControllerServer::runServer(int port) {
 
     int server_fd = setup_server(port);
     if (server_fd < 0) {
-        std::cerr << "Failed to set up server." << std::endl;
+        cerr << "Failed to set up server." << endl;
         return;
     }
 
     while (true) {
         int client_fd = wait_for_connection(server_fd);
         if (client_fd < 0) {
-            std::cerr << "Failed to accept connection." << std::endl;
+            cerr << "Failed to accept connection." << endl;
             continue;
         }
 
         char buffer[4096] = {0};
         if (receive_message(client_fd, buffer, 4096)) {
             auto starttime = timenow();
-            std::string statusstr = buffer;
+            string statusstr = buffer;
             if(buffer == ""){
                 send_message(client_fd, verifyMsg(0, 0, 0).c_str());
             }else{
@@ -36,17 +36,17 @@ void ArmControllerServer::runServer(int port) {
                 int isinit = statusjson["isinit"];
                 json arms = statusjson["Arms"];
 
-                std::string jsonstr = transCmds(arms); // 调用命令处理函数
+                string jsonstr = transCmds(arms); // 调用命令处理函数
                 if(!jsonstr.empty()){
                     bool res = arm_verify(jsonstr);
                     send_message(client_fd, verifyMsg(armid, cmdid, res).c_str());
                 }
                 // if (!jsonstr.empty() && !arm_verify(jsonstr)) {
-                //     std::string controljsonstr = arm_control(jsonstr);
+                //     string controljsonstr = arm_control(jsonstr);
                 //     appendToFile(controljsonstr, "json/control.json");
 
                 //     if (!controljsonstr.empty()) {
-                //         std::string cmdsendback = jsonToCmds(controljsonstr);
+                //         string cmdsendback = jsonToCmds(controljsonstr);
                 //         send_message(client_fd, cmdsendback.c_str());
                 //     }
                 // } else {
@@ -54,7 +54,7 @@ void ArmControllerServer::runServer(int port) {
                 // }
 
                 auto endtime = timenow();
-                appendToFile(std::to_string(endtime - starttime), "timeused.md");
+                appendToFile(to_string(endtime - starttime), "timeused.md");
             }
         }
 
@@ -65,7 +65,7 @@ void ArmControllerServer::runServer(int port) {
 }
 
 /*为原始status信息进行处理的总体函数，先输出一个格式能对接transCmds，后续可以考虑再结合*/
-json ArmControllerServer::preprocessStateJson(json statusstr){
+json ArmControllerServer::preprocessStateJson(string statusstr){
     json statusjson = json::parse(statusstr);
     int armid = statusjson["armid"];
     int cmdid = statusjson["cmdid"];
@@ -74,95 +74,226 @@ json ArmControllerServer::preprocessStateJson(json statusstr){
     json retarms = json::array();
     if(isinit){//暂定和之前一样验证前三个指令，目前是所有arm都验证，会有重复验证
         for(json arm: arms){
-            std::string cmds = arm["Cmds"];
-            std::string subcmds = subCommaStr(cmds, 0, 3);
+            string cmds = arm["Cmds"];
+            string subcmds = subCommaStr(cmds, 0, 3);
             arm["Cmds"] = subcmds;
             //duration后面暂时用不到,改不改区别不大
-            std::string durations = arm["Durations"];
-            std::string subdurations = subCommaStr(durations, 0, 3);
+            string durations = arm["Durations"];
+            string subdurations = subCommaStr(durations, 0, 3);
             arm["Durations"] = subcmds;
             retarms.push_back(arm);
         }
     }else{
         json vrfarm;
+        long long int starttimearray[6] = {LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX};
+        long long int starttimedelay[6] = {LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX};
         for(json arm: arms){
+            starttimearray[static_cast<int>(arm["ArmId"])] = arm["StartTime"];
             if(arm["ArmId"] == armid){
                 vrfarm = arm;
             }
         }
         if(vrfarm.empty()){
             return nullptr;
+        }else{
+            //计算指令起始的delay方便后续计算，后续只提供相对时间
+            for(int i = 1; i < 6; ++i){
+                if(starttimearray[i] != LLONG_MAX){//本次验证涉及该机械臂
+                    starttimedelay[i] = starttimearray[i] - starttimearray[armid];
+                }
+            }
+            // 获得vrfarm需要获得的一切信息，并生成最终的vrfarmjson
+            pair<pair<int, int>, json> vrfarminfo = getVrfArmInfo(vrfarm, cmdid);
+            pair<int, int> timepair = vrfarminfo.first;
+            json newvrfarm = vrfarminfo.second;
+
+            retarms.push_back(newvrfarm);
+            int finalstarttime[6] = {0};
+            int minstarttime = INT_MAX;
+            finalstarttime[armid] = timepair.first;
+            minstarttime = min(minstarttime, timepair.first);
+
+            //第二次遍历期望获得其他的armjson，并且获取足够的信息构造最终的delay
+            for(json arm: arms){
+                int tempindex = arm["ArmId"];
+                if(tempindex != armid){
+                    pair<int, json> otherarminfo = getOtherArmInfo(arm, timepair, starttimedelay[tempindex]);
+                    if(otherarminfo.first != INT_MAX){
+                        finalstarttime[tempindex] = otherarminfo.first;
+                        minstarttime = min(minstarttime, otherarminfo.first);
+                        retarms.push_back(otherarminfo.second);
+                    }
+                }
+            }
+            // 最终delay就是看下最小的starttime,调为0
+            for(json& retarm: retarms){
+                int tempindex = retarm["CmdId"];
+                retarm["delay"] = finalstarttime[tempindex] - minstarttime;
+            }
+
         }
 
     }
     return retarms;
 }
 
-std::pair<std::pair<int, int>, json> ArmControllerServer::getExecTime(json& j, int cmdId) {
+/*获取需要vrfarm的具体的指令构造和指令起止相对时间*/
+pair<pair<int, int>, json> ArmControllerServer::getVrfArmInfo(json armjson, int vrfid) {
     
     // 获取 Cmds 和 Durations 字段
-    std::string cmds = j["Cmds"];
-    std::string durations = j["Durations"];
-    std::string locsstr = j["Locs"];
+    string cmds = armjson["Cmds"];
+    string durations = armjson["Durations"];
+    string locsstr = armjson["Locs"];
+    int startid = armjson["CmdId"];
 
+    /*初始化locs，为后续指令构造做准备*/
     float locallocs[6];
-    std::istringstream locsStream(locsstr);
-    std::string loc;
+    istringstream locsStream(locsstr);
+    string loc;
     int i = 0;
-    while (std::getline(locsStream, loc, ',')) {
+    while (getline(locsStream, loc, ',')) {
         if (!loc.empty()) {
-            locallocs[i] = 
+            locallocs[i] = stof(loc);
+            i++;
         }
     }
-    
+
     // 按逗号分割指令和持续时间
-    std::vector<std::string> cmdList;
-    std::vector<int> durationList;
-    
-    std::istringstream cmdStream(cmds);
-    std::string cmd;
-    while (std::getline(cmdStream, cmd, ',')) {
-        if (!cmd.empty()) {
-            cmdList.push_back(cmd);
-            
-        }
-    }
-    
-    std::istringstream durationStream(durations);
-    std::string duration;
-    while (std::getline(durationStream, duration, ',')) {
-        if (!duration.empty()) {
-            durationList.push_back(std::stoi(duration));
-        }
-    }
+    vector<string> cmdList = decodeCommaStr(cmds, 0, INT_MAX);
+    vector<int> durationList = commaStrtoInt(durations, 0, INT_MAX);
+    assert(cmdList.size() == durationList.size());
     
     // 检查 cmdId 的有效性
-    int cmdIndex = cmdId - j["CmdId"]; // 计算 Cmds 中的索引
+    int cmdIndex = vrfid - startid; // 计算 Cmds 中的索引
     if (cmdIndex < 0 || cmdIndex >= static_cast<int>(cmdList.size())) {
-        throw std::invalid_argument("Invalid CmdId provided.");
+        throw invalid_argument("Invalid CmdId provided.");
+    }
+    
+    string vrfcmd;
+    int starttime = 0;
+    int duration;
+    for(int i = 0; i < cmdList.size(); ++i) {
+        string cmd = cmdList[i];
+        if (!cmd.empty()) {
+            if(i + startid < vrfid){
+                updateLocs(cmd, locallocs);
+                starttime += durationList[i];
+            }else if((i + startid) == vrfid){
+                vrfcmd = cmd;
+                duration = durationList[i];
+            }
+        }
     }
 
-    // 计算起止时间
-    int startTime = 0; // Cmds 的第一条指令的起始时间为 0
-    int durationSum = 0;
+    json newarmjson;
+    newarmjson["ArmId"] = armjson["ArmId"];
+    newarmjson["Cmds"] = vrfcmd;
+    string locallocsstr;
+    for(int i = 0; i < 6; ++i){
+        if(!locallocsstr.empty()){
+            locallocsstr += ",";
+        }
+        locallocsstr += to_string(locallocs[i]);
+    }
+    newarmjson["Locs"] = locallocsstr;
+    //不需要starttime，在执行时看的是delay
+    // newarmjson["StartTime"] = to_string()
 
-    // 累加直到 cmdId 对应的指令
-    for (int i = 0; i < cmdIndex; ++i) {
-        durationSum += durationList[i];
+    return {{starttime, starttime + duration}, newarmjson};
+}
+
+/*需要注意这里返回的starttime已经是被delay修正过的了，和vrfarm保持一个基准了*/
+pair<int, json> ArmControllerServer::getOtherArmInfo(json armjson, pair<int, int> timepair, int delay){
+    // 获取 Cmds 和 Durations 字段
+    string cmds = armjson["Cmds"];
+    string durations = armjson["Durations"];
+    string locsstr = armjson["Locs"];
+    // int startid = armjson["CmdId"];
+
+    /*初始化locs，为后续指令构造做准备*/
+    float locallocs[6];
+    istringstream locsStream(locsstr);
+    string loc;
+    int i = 0;
+    while (getline(locsStream, loc, ',')) {
+        if (!loc.empty()) {
+            locallocs[i] = stof(loc);
+            i++;
+        }
     }
 
-    int endTime = startTime + durationSum + durationList[cmdIndex];
-    return {{startTime + durationSum, endTime}, j};
+    // 按逗号分割指令和持续时间
+    vector<string> cmdList = decodeCommaStr(cmds, 0, INT_MAX);
+    vector<int> durationList = commaStrtoInt(durations, 0, INT_MAX);
+    assert(cmdList.size() == durationList.size());
+    
+    string newcmds;
+    int starttime = INT_MAX;
+    int endtime = INT_MAX; 
+    int vrfstart = timepair.first;
+    int vrfend = timepair.second;
+    int curtime = delay;
+    //另外有一种匹配思路是，先求每一条指令的区间，然后写一个算法专门看两个区间是否匹配，这样匹配一定不出错。
+    //但是后续看cmds和locs还是一样麻烦。
+    if(curtime < vrfend){//否则就是空
+        for(int i = 0; i < cmdList.size(); ++i) {
+            string cmd = cmdList[i];
+            int duration = durationList[i];
+            if (!cmd.empty()) {
+                if(starttime == INT_MAX){//还没找到起点
+                    if(curtime + duration <= vrfstart){//还不是起点
+                        updateLocs(cmd, locallocs);
+                    }else{
+                        starttime = curtime;
+                        if(!newcmds.empty()){
+                            newcmds += ",";
+                        }
+                        newcmds += cmd;
+                        if(curtime + duration >= vrfend){//目前能想到的边界情况
+                            endtime = curtime + duration;
+                        }
+                    }
+                }else if(endtime == INT_MAX){
+                    if(!newcmds.empty()){
+                        newcmds += ",";
+                    }
+                    newcmds += cmd;
+                    if(curtime + duration >= vrfend){
+                        endtime = curtime + duration;
+                    }
+                }
+                curtime += duration;
+            }
+        }
+    }else{//后续不需要参与讨论了，但是不定义此情况为出错。其实真实情况也不会发生
+        return {INT_MAX, nullptr};
+    }
+    //不再需要check endtime有没有，不关注，求endtime只是希望能及时停下来
+    json newarmjson;
+    newarmjson["ArmId"] = armjson["ArmId"];
+    newarmjson["Cmds"] = newcmds;
+    string locallocsstr;
+    for(int i = 0; i < 6; ++i){
+        if(!locallocsstr.empty()){
+            locallocsstr += ",";
+        }
+        locallocsstr += to_string(locallocs[i]);
+    }
+    newarmjson["Locs"] = locallocsstr;
+    //不需要starttime，在执行时看的是delay
+    // newarmjson["StartTime"] = to_string()
+
+    return {starttime, newarmjson};
 }
 
 /*根据传来的locs信息确定起始位置*/
-json ArmControllerServer::parseInitialState(const std::string& data) {
-    std::istringstream iss(data);
-    std::string value;
+json ArmControllerServer::parseInitialState(const string& data) {
+    istringstream iss(data);
+    string value;
     locs.clear();
 
     while (getline(iss, value, ',')) {
-        locs.push_back(std::stod(value));
+        locs.push_back(stod(value));
     }
     json initialState = {
         {"Mode", "Cartesian"},
@@ -175,9 +306,9 @@ json ArmControllerServer::parseInitialState(const std::string& data) {
 
 /*几乎是硬编码做的指令解析，不过由于本身指令解析不是实验重点，
 也没必要用更复杂的方法*/
-json ArmControllerServer::parseCommand(const std::string& cmd) {
-    std::istringstream iss(cmd);
-    std::string part;
+json ArmControllerServer::parseCommand(const string& cmd) {
+    istringstream iss(cmd);
+    string part;
     json behavior;
     isincre = false;
     isangle = false;
@@ -205,16 +336,16 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
             }
         } else if (part[0] == 'X' || part[0] == 'Y' || part[0] == 'Z' ||
          part[0] == 'A' || part[0] == 'B' || part[0] == 'C') {
-            std::size_t pos = part.find_first_not_of("ABCXYZ");
-            if (pos != std::string::npos) {
+            size_t pos = part.find_first_not_of("ABCXYZ");
+            if (pos != string::npos) {
                 switch (part[0])
                 {
                 case 'X':
                     if(!isincre){
-                        locs[0] = std::stod(part.substr(pos));
+                        locs[0] = stod(part.substr(pos));
                     }
                     else{
-                        locs[0] += std::stod(part.substr(pos));
+                        locs[0] += stod(part.substr(pos));
                     }
                     if(!isangle){
                         behavior["X"].push_back(locs[0]);
@@ -224,10 +355,10 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
                     break;
                 case 'Y':
                     if(!isincre){
-                        locs[1] = std::stod(part.substr(pos));
+                        locs[1] = stod(part.substr(pos));
                     }
                     else{
-                        locs[1] += std::stod(part.substr(pos));
+                        locs[1] += stod(part.substr(pos));
                     }
                     if(!isangle){
                         behavior["X"].push_back(locs[1]);
@@ -237,10 +368,10 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
                     break;
                 case 'Z':
                     if(!isincre){
-                        locs[2] = std::stod(part.substr(pos));
+                        locs[2] = stod(part.substr(pos));
                     }
                     else{
-                        locs[2] += std::stod(part.substr(pos));
+                        locs[2] += stod(part.substr(pos));
                     }
                     if(!isangle){
                         behavior["X"].push_back(locs[2]);
@@ -250,10 +381,10 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
                     break;
                 case 'A':
                     if(!isincre){
-                        locs[3] = std::stod(part.substr(pos));
+                        locs[3] = stod(part.substr(pos));
                     }
                     else{
-                        locs[3] += std::stod(part.substr(pos));
+                        locs[3] += stod(part.substr(pos));
                     }
                     if(!isangle){
                         behavior["R"].push_back(locs[3]);
@@ -263,10 +394,10 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
                     break;
                 case 'B':
                     if(!isincre){
-                        locs[4] = std::stod(part.substr(pos));
+                        locs[4] = stod(part.substr(pos));
                     }
                     else{
-                        locs[4] += std::stod(part.substr(pos));
+                        locs[4] += stod(part.substr(pos));
                     }
                     if(!isangle){
                         behavior["R"].push_back(locs[4]);
@@ -276,10 +407,10 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
                     break;
                 case 'C':
                     if(!isincre){
-                        locs[5] = std::stod(part.substr(pos));
+                        locs[5] = stod(part.substr(pos));
                     }
                     else{
-                        locs[5] += std::stod(part.substr(pos));
+                        locs[5] += stod(part.substr(pos));
                     }
                     if(!isangle){
                         behavior["R"].push_back(locs[5]);
@@ -306,25 +437,25 @@ json ArmControllerServer::parseCommand(const std::string& cmd) {
 json ArmControllerServer::parseComponent(const json& singleArm, json& result){
     json component;
     int armindex = singleArm["ArmId"];
-    std::string initialStateData = singleArm["Locs"];
-    std::string commands = singleArm["Cmds"];
+    string initialStateData = singleArm["Locs"];
+    string commands = singleArm["Cmds"];
     if (armConfigs.find(armindex) != armConfigs.end()) {
         component["BasePosition"] = armConfigs[armindex]["BasePosition"];
         for (const auto& obstacle : armConfigs[armindex]["Obstacles"]) {
                 result["Obstacles"].push_back(obstacle); // 逐个添加
             }
     } else {
-        std::cout << "Invalid arm index." << std::endl;
+        cout << "Invalid arm index." << endl;
     }
     component["InitialState"] = parseInitialState(initialStateData);
     component["Behavior"] = json::array();
 
-    std::istringstream iss(commands);
-    std::string token;
+    istringstream iss(commands);
+    string token;
     json lastCommand;
     bool hasTargetState = false;
     while (getline(iss, token, ',')) {
-        if (token.find("M20") != std::string::npos || token.find("M21") != std::string::npos) {
+        if (token.find("M20") != string::npos || token.find("M21") != string::npos) {
             json behavior = parseCommand(token);
             lastCommand = behavior;
             hasTargetState = true;
@@ -343,7 +474,7 @@ json ArmControllerServer::parseComponent(const json& singleArm, json& result){
 }
 
 // 主函数，处理整个指令字符串
-std::string ArmControllerServer::transCmds(json arms) {
+string ArmControllerServer::transCmds(json arms) {
     
     json result;
     result["Obstacles"] = json::array();
@@ -360,12 +491,12 @@ std::string ArmControllerServer::transCmds(json arms) {
     return result.dump(4);  // 输出格式化的 JSON 字符串
 }
 
-std::string ArmControllerServer::generateCmd(const json& behavior) {
-    std::string cmd = "M20 G90 "; // 假设都是绝对坐标系统
+string ArmControllerServer::generateCmd(const json& behavior) {
+    string cmd = "M20 G90 "; // 假设都是绝对坐标系统
     cmd += behavior["Motion type"] == "Joint" ? "G00 " : "G01 ";
 
     // 处理 X, Y, Z 坐标
-    std::vector<std::string> axis = {"X", "Y", "Z"};
+    vector<string> axis = {"X", "Y", "Z"};
     for (int i = 0; i < 3; ++i) {
         cmd += axis[i] + doubleToStr(behavior["X"][i]) + " ";
     }
@@ -382,17 +513,17 @@ std::string ArmControllerServer::generateCmd(const json& behavior) {
 /*根据验证与控制生成的结果，将其重新封装为返回的cmd串。
 目前的格式不太美妙，可以继续设计，返回的串的格式很机械，
 就是按armId的顺序排的*/
-std::string ArmControllerServer::jsonToCmds(const std::string& jsonString) {
+string ArmControllerServer::jsonToCmds(const string& jsonString) {
     json j = json::parse(jsonString);
-    std::string cmdsback = "";
-    std::vector<std::string> cmds;
+    string cmdsback = "";
+    vector<string> cmds;
     cmds.resize(6);
     for(int i = 0; i < 6; ++i){
         cmds[i] = "";
     }
 
     for(const auto& component: j["Components"]){
-        std::string cmd = "";
+        string cmd = "";
         for (const auto& behavior : component["Behavior"]) {
             if (!cmd.empty()) {
                 cmd += ",";
@@ -418,8 +549,8 @@ std::string ArmControllerServer::jsonToCmds(const std::string& jsonString) {
     return cmdsback;
 }
 
-std::string ArmControllerServer::verifyMsg(const int armid, const int cmdid, const int vrfres){
-    std::string vrfmsg = "";
+string ArmControllerServer::verifyMsg(const int armid, const int cmdid, const int vrfres){
+    string vrfmsg = "";
     json jsonmsg;
     jsonmsg["armid"] = armid;
     jsonmsg["cmdid"] = cmdid;
@@ -428,9 +559,9 @@ std::string ArmControllerServer::verifyMsg(const int armid, const int cmdid, con
     return vrfmsg;
 }
 
-void ArmControllerServer::updateLocs(std::string cmd, float locs[]){
-    std::istringstream stream(cmd);
-    std::string token;
+void ArmControllerServer::updateLocs(string cmd, float locs[]){
+    istringstream stream(cmd);
+    string token;
     char identifier;
     float value;
     bool isincre = false; //一次只考虑当前这一条指令，简单这么写就行
@@ -445,7 +576,7 @@ void ArmControllerServer::updateLocs(std::string cmd, float locs[]){
                 idx++; // 如果标识符后面有空格，则跳过
             }
 
-            value = std::stof(token.substr(idx));
+            value = stof(token.substr(idx));
 
             if(!isincre){
                 if (identifier == 'X') {
@@ -483,15 +614,15 @@ void ArmControllerServer::updateLocs(std::string cmd, float locs[]){
 }
 
 
-std::string doubleToStr(double value) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << value;
+string doubleToStr(double value) {
+    ostringstream oss;
+    oss << fixed << setprecision(2) << value;
     return oss.str();
 }
 
-void overwriteToFile(const std::string& str, const std::string& filename) {
-    // 打开文件，使用 std::ios::out 模式以覆盖方式写入
-    std::ofstream file(filename, std::ios::out);
+void overwriteToFile(const string& str, const string& filename) {
+    // 打开文件，使用 ios::out 模式以覆盖方式写入
+    ofstream file(filename, ios::out);
     if (file.is_open()) {
         // 写入字符串并添加换行符
         file << str << '\n';
@@ -499,61 +630,61 @@ void overwriteToFile(const std::string& str, const std::string& filename) {
         file.close();
     } else {
         // 文件打开失败，输出错误消息
-        std::cerr << "Unable to open file: " << filename << std::endl;
+        cerr << "Unable to open file: " << filename << endl;
     }
 }
 
-std::string readFile(const std::string& filename) {
+string readFile(const string& filename) {
     // 打开文件
-    std::ifstream file(filename);
+    ifstream file(filename);
     if (!file.is_open()) {
         // 文件打开失败，输出错误消息
-        std::cerr << "Unable to open file: " << filename << std::endl;
+        cerr << "Unable to open file: " << filename << endl;
         return "";
     }
     
-    // 使用 std::istreambuf_iterator 读取数据，直到 EOF
-    std::string str((std::istreambuf_iterator<char>(file)),
-                    std::istreambuf_iterator<char>());
+    // 使用 istreambuf_iterator 读取数据，直到 EOF
+    string str((istreambuf_iterator<char>(file)),
+                    istreambuf_iterator<char>());
     
     // 关闭文件
     file.close();
     
     // 打印读取的结果
-    std::cout << "Read file: " << filename << std::endl;
+    cout << "Read file: " << filename << endl;
     
     return str;
 }
 
 long long int timenow(){
-    auto now = std::chrono::high_resolution_clock::now();
+    auto now = chrono::high_resolution_clock::now();
     auto duration_since_epoch = now.time_since_epoch();
-    long long int millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration_since_epoch).count();
+    long long int millis = chrono::duration_cast<chrono::milliseconds>(duration_since_epoch).count();
     return millis;
 }
 
-void appendToFile(const std::string& str, const std::string& filename) {
-    // 打开文件，使用 std::ios::app 模式以追加方式写入
-    std::ofstream file(filename, std::ios::app);
+void appendToFile(const string& str, const string& filename) {
+    // 打开文件，使用 ios::app 模式以追加方式写入
+    ofstream file(filename, ios::app);
     if (file.is_open()) {
         // 写入字符串并添加换行符
-        file << str << std::endl;
+        file << str << endl;
         // 关闭文件
         file.close();
     } else {
         // 文件打开失败，输出错误消息
-        std::cerr << "Unable to open file: " << filename << std::endl;
+        cerr << "Unable to open file: " << filename << endl;
     }
 }
 
 // 将单个指令串转换为字符串数组，指定起始索引和长度
-std::vector<std::string> decodeCommaStr(const std::string& commands, int startIndex, int length) {
-    std::vector<std::string> commandArray;
-    std::stringstream ss(commands);
-    std::string command;
+vector<string> decodeCommaStr(const string& commands, int startIndex, int length) {
+    vector<string> commandArray;
+    stringstream ss(commands);
+    string command;
     int index = 0;
 
-    while (std::getline(ss, command, ',')) {
+    while (getline(ss, command, ',')) {
         if (index >= startIndex && index < startIndex + length) {
             commandArray.push_back(command);
         }
@@ -563,13 +694,29 @@ std::vector<std::string> decodeCommaStr(const std::string& commands, int startIn
     return commandArray;
 }
 
-std::string subCommaStr(const std::string& commands, int startIndex, int length) {
-    std::string subcmdstr;
-    std::stringstream ss(commands);
-    std::string command;
+vector<int> commaStrtoInt(const string& commands, int startIndex, int length) {
+    vector<int> commandArray;
+    stringstream ss(commands);
+    string command;
     int index = 0;
 
-    while (std::getline(ss, command, ',')) {
+    while (getline(ss, command, ',')) {
+        if (index >= startIndex && index < startIndex + length) {
+            commandArray.push_back(stoi(command));
+        }
+        index++;
+    }
+
+    return commandArray;
+}
+
+string subCommaStr(const string& commands, int startIndex, int length) {
+    string subcmdstr;
+    stringstream ss(commands);
+    string command;
+    int index = 0;
+
+    while (getline(ss, command, ',')) {
         if (index >= startIndex && index < startIndex + length) {
             if(!subcmdstr.empty()){
                 subcmdstr += ",";
@@ -583,8 +730,8 @@ std::string subCommaStr(const std::string& commands, int startIndex, int length)
 }
 
 // 将字符串数组转换为单个指令串，指定起始索引和长度
-std::string encodeCommaStr(std::string commandArray[], int arraysize, int startIndex, int length) {
-    std::string commands;
+string encodeCommaStr(string commandArray[], int arraysize, int startIndex, int length) {
+    string commands;
     
     for (int i = startIndex; i < startIndex + length && i < arraysize; ++i) {
         commands += commandArray[i];
@@ -598,7 +745,7 @@ std::string encodeCommaStr(std::string commandArray[], int arraysize, int startI
 
 
 /*由于全部是string类型，最好不去使用，而是手动填写*/
-json unordered_map_to_json(const std::unordered_map<std::string, std::string>& umap) {
+json unordered_map_to_json(const unordered_map<string, string>& umap) {
     json j;
     for (const auto& pair : umap) {
         j[pair.first] = pair.second;
@@ -607,11 +754,11 @@ json unordered_map_to_json(const std::unordered_map<std::string, std::string>& u
 }
 
 /*现在感觉自己蠢了，这两用在cJSON上可能有点作用*/
-std::unordered_map<std::string, std::string> json_to_unordered_map(const json& j) {
-    std::unordered_map<std::string, std::string> umap;
+unordered_map<string, string> json_to_unordered_map(const json& j) {
+    unordered_map<string, string> umap;
     for (auto it = j.begin(); it != j.end(); ++it) {
-        std::string key = it.key(); 
-        std::string value = it.value().is_string() ? it.value().get<std::string>() : it.value().dump(); // 将非字符串值转换为字符串
+        string key = it.key(); 
+        string value = it.value().is_string() ? it.value().get<string>() : it.value().dump(); // 将非字符串值转换为字符串
         umap[key] = value;
     }
     return umap;
