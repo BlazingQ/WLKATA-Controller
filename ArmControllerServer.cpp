@@ -5,9 +5,9 @@ ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
 }
 
 void ArmControllerServer::runServer(int port) {
-    overwriteToFile("\n", "json/verify.json");
-    overwriteToFile("\n", "json/control.json");
-    overwriteToFile("\n", "json/status.json");
+    overwriteToFile("", "json/control.json");
+    overwriteToFile("", "json/status.json");
+    overwriteToFile("", "json/finalstatus.json");
 
     int server_fd = setup_server(port);
     if (server_fd < 0) {
@@ -26,35 +26,37 @@ void ArmControllerServer::runServer(int port) {
         if (receive_message(client_fd, buffer, 4096)) {
             auto starttime = timenow();
             string statusstr = buffer;
-            if(buffer == ""){
+            if(statusstr.empty() || statusstr[0] == '^' ){
                 send_message(client_fd, verifyMsg(0, 0, 0).c_str());
             }else{
                 appendToFile(statusstr, "json/status.json");
                 json statusjson = json::parse(statusstr);
-                int armid = statusjson["armid"];
-                int cmdid = statusjson["cmdid"];
-                int isinit = statusjson["isinit"];
-                json arms = statusjson["Arms"];
+                int armid = statusjson["ArmId"];
+                int vrfid = statusjson["VrfId"];
+                int isinit = statusjson["IsInit"];
+                json arms = preprocessStateJson(statusstr);
+                if(!arms.empty()){
+                    appendToFile(arms.dump(4), "json/finalstatus.json");
+                    string jsonstr = transCmds(arms); // 调用命令处理函数
+                    if(!jsonstr.empty()){
+                        bool res = arm_verify(jsonstr);
+                        send_message(client_fd, verifyMsg(armid, vrfid, res).c_str());
+                    }
+                    // if (!jsonstr.empty() && !arm_verify(jsonstr)) {
+                    //     string controljsonstr = arm_control(jsonstr);
+                    //     appendToFile(controljsonstr, "json/control.json");
 
-                string jsonstr = transCmds(arms); // 调用命令处理函数
-                if(!jsonstr.empty()){
-                    bool res = arm_verify(jsonstr);
-                    send_message(client_fd, verifyMsg(armid, cmdid, res).c_str());
+                    //     if (!controljsonstr.empty()) {
+                    //         string cmdsendback = jsonToCmds(controljsonstr);
+                    //         send_message(client_fd, cmdsendback.c_str());
+                    //     }
+                    // } else {
+                    //     send_message(client_fd, "OK");
+                    // }
+
+                    auto endtime = timenow();
+                    appendToFile(to_string(endtime - starttime), "timeused.md");
                 }
-                // if (!jsonstr.empty() && !arm_verify(jsonstr)) {
-                //     string controljsonstr = arm_control(jsonstr);
-                //     appendToFile(controljsonstr, "json/control.json");
-
-                //     if (!controljsonstr.empty()) {
-                //         string cmdsendback = jsonToCmds(controljsonstr);
-                //         send_message(client_fd, cmdsendback.c_str());
-                //     }
-                // } else {
-                //     send_message(client_fd, "OK");
-                // }
-
-                auto endtime = timenow();
-                appendToFile(to_string(endtime - starttime), "timeused.md");
             }
         }
 
@@ -67,9 +69,9 @@ void ArmControllerServer::runServer(int port) {
 /*为原始status信息进行处理的总体函数，先输出一个格式能对接transCmds，后续可以考虑再结合*/
 json ArmControllerServer::preprocessStateJson(string statusstr){
     json statusjson = json::parse(statusstr);
-    int armid = statusjson["armid"];
-    int cmdid = statusjson["cmdid"];
-    int isinit = statusjson["isinit"];
+    int armid = statusjson["ArmId"];
+    int vrfid = statusjson["VrfId"];
+    int isinit = statusjson["IsInit"];
     json arms = statusjson["Arms"];
     json retarms = json::array();
     if(isinit){//暂定和之前一样验证前三个指令，目前是所有arm都验证，会有重复验证
@@ -88,7 +90,8 @@ json ArmControllerServer::preprocessStateJson(string statusstr){
         long long int starttimearray[6] = {LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX};
         long long int starttimedelay[6] = {LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX,LLONG_MAX};
         for(json arm: arms){
-            starttimearray[static_cast<int>(arm["ArmId"])] = arm["StartTime"];
+            string timestr = arm["StartTime"];
+            starttimearray[static_cast<int>(arm["ArmId"])] = stoll(timestr);
             if(arm["ArmId"] == armid){
                 vrfarm = arm;
             }
@@ -103,7 +106,7 @@ json ArmControllerServer::preprocessStateJson(string statusstr){
                 }
             }
             // 获得vrfarm需要获得的一切信息，并生成最终的vrfarmjson
-            pair<pair<int, int>, json> vrfarminfo = getVrfArmInfo(vrfarm, cmdid);
+            pair<pair<int, int>, json> vrfarminfo = getVrfArmInfo(vrfarm, vrfid);
             pair<int, int> timepair = vrfarminfo.first;
             json newvrfarm = vrfarminfo.second;
 
@@ -127,7 +130,7 @@ json ArmControllerServer::preprocessStateJson(string statusstr){
             }
             // 最终delay就是看下最小的starttime,调为0
             for(json& retarm: retarms){
-                int tempindex = retarm["CmdId"];
+                int tempindex = retarm["ArmId"];
                 retarm["delay"] = finalstarttime[tempindex] - minstarttime;
             }
 
@@ -196,8 +199,9 @@ pair<pair<int, int>, json> ArmControllerServer::getVrfArmInfo(json armjson, int 
         locallocsstr += to_string(locallocs[i]);
     }
     newarmjson["Locs"] = locallocsstr;
-    //不需要starttime，在执行时看的是delay
-    // newarmjson["StartTime"] = to_string()
+    //不需要starttime，在执行时看的是delay，但是加上方便看效果
+    newarmjson["TimePair"] = {starttime, starttime + duration};
+    newarmjson["StartId"] = vrfid;
 
     return {{starttime, starttime + duration}, newarmjson};
 }
@@ -208,7 +212,7 @@ pair<int, json> ArmControllerServer::getOtherArmInfo(json armjson, pair<int, int
     string cmds = armjson["Cmds"];
     string durations = armjson["Durations"];
     string locsstr = armjson["Locs"];
-    // int startid = armjson["CmdId"];
+    int startid = armjson["CmdId"];
 
     /*初始化locs，为后续指令构造做准备*/
     float locallocs[6];
@@ -233,6 +237,7 @@ pair<int, json> ArmControllerServer::getOtherArmInfo(json armjson, pair<int, int
     int vrfstart = timepair.first;
     int vrfend = timepair.second;
     int curtime = delay;
+    int newstartid = INT_MAX;
     //另外有一种匹配思路是，先求每一条指令的区间，然后写一个算法专门看两个区间是否匹配，这样匹配一定不出错。
     //但是后续看cmds和locs还是一样麻烦。
     if(curtime < vrfend){//否则就是空
@@ -247,6 +252,9 @@ pair<int, json> ArmControllerServer::getOtherArmInfo(json armjson, pair<int, int
                         starttime = curtime;
                         if(!newcmds.empty()){
                             newcmds += ",";
+                        }
+                        if(newcmds.empty()){
+                            newstartid = startid + i;
                         }
                         newcmds += cmd;
                         if(curtime + duration >= vrfend){//目前能想到的边界情况
@@ -280,8 +288,9 @@ pair<int, json> ArmControllerServer::getOtherArmInfo(json armjson, pair<int, int
         locallocsstr += to_string(locallocs[i]);
     }
     newarmjson["Locs"] = locallocsstr;
-    //不需要starttime，在执行时看的是delay
-    // newarmjson["StartTime"] = to_string()
+    //不需要starttime，在执行时看的是delay，但是加上方便看效果
+    newarmjson["TimePair"] = {starttime, endtime};
+    newarmjson["StartId"] = newstartid;
 
     return {starttime, newarmjson};
 }
@@ -549,12 +558,12 @@ string ArmControllerServer::jsonToCmds(const string& jsonString) {
     return cmdsback;
 }
 
-string ArmControllerServer::verifyMsg(const int armid, const int cmdid, const int vrfres){
+string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const int vrfres){
     string vrfmsg = "";
     json jsonmsg;
-    jsonmsg["armid"] = armid;
-    jsonmsg["cmdid"] = cmdid;
-    jsonmsg["vrfres"] = vrfres;
+    jsonmsg["ArmId"] = armid;
+    jsonmsg["VrfId"] = vrfid;
+    jsonmsg["VrfRes"] = vrfres;
     vrfmsg = jsonmsg.dump(4);
     return vrfmsg;
 }
@@ -625,7 +634,7 @@ void overwriteToFile(const string& str, const string& filename) {
     ofstream file(filename, ios::out);
     if (file.is_open()) {
         // 写入字符串并添加换行符
-        file << str << '\n';
+        file << str;
         // 关闭文件
         file.close();
     } else {

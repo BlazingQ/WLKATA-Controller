@@ -38,7 +38,7 @@ private:
     string transCmds(json arms);
     string generateCmd(const json& behavior);
     string jsonToCmds(const string& jsonString);
-    string verifyMsg(const int armid, const int cmdid, const int vrfres);
+    string verifyMsg(const int armid, const int vrfid, const int vrfres);
     void initializeArmConfigs();
     void updateLocs(string cmd, float locs[]);
 
