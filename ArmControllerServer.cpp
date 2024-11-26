@@ -7,7 +7,7 @@ ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
 void ArmControllerServer::runServer(int port) {
     overwriteToFile("", "json/control.json");
     overwriteToFile("", "json/status.json");
-    overwriteToFile("", "json/finalstatus.json");
+    // overwriteToFile("", "json/finalstatus.json");
 
     int server_fd = setup_server(port);
     if (server_fd < 0) {
@@ -29,6 +29,7 @@ void ArmControllerServer::runServer(int port) {
             if(statusstr.empty() || statusstr[0] == '^' ){
                 send_message(client_fd, verifyMsg(0, 0, 0).c_str());
             }else{
+                appendToFile("\noringinal status:", "json/status.json");
                 appendToFile(statusstr, "json/status.json");
                 json statusjson = json::parse(statusstr);
                 int armid = statusjson["ArmId"];
@@ -36,7 +37,8 @@ void ArmControllerServer::runServer(int port) {
                 int isinit = statusjson["IsInit"];
                 json arms = preprocessStateJson(statusstr);
                 if(!arms.empty()){
-                    appendToFile(arms.dump(4), "json/finalstatus.json");
+                    appendToFile("\nprocessed status", "json/status.json");
+                    appendToFile(arms.dump(4), "json/status.json");
                     string jsonstr = transCmds(arms); // 调用命令处理函数
                     if(!jsonstr.empty()){
                         bool res = arm_verify(jsonstr);
