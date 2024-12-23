@@ -35,7 +35,6 @@ private:
     json parseInitialState(const string& data);
     json parseCommand(const string& cmd);
     json parseComponent(const json& singleArm, json& result);
-    string transCmds(json arms);
     string generateCmd(const json& behavior);
     string jsonToCmds(const string& jsonString);
     string verifyMsg(const int armid, const int vrfid, const int vrfres);
@@ -45,6 +44,7 @@ private:
 public:
     ArmControllerServer();
     void runServer(int port);
+    string transCmds(json arms);
 };
 
 string doubleToStr(double value);
