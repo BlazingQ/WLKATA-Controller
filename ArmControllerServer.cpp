@@ -32,7 +32,8 @@ void ArmControllerServer::runServer(int port) {
                 appendToFile("\noringinal status:", "json/status.json");
                 appendToFile(statusstr, "json/status.json");
                 json statusjson = json::parse(statusstr);
-                int armid = statusjson["ArmId"];
+                //armid here is vrfarm, vrfid is vrfcmd
+                int armid = statusjson["ArmId"]; 
                 int vrfid = statusjson["VrfId"];
                 int isinit = statusjson["IsInit"];
                 json arms = preprocessStateJson(statusstr);
