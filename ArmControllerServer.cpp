@@ -44,18 +44,20 @@ void ArmControllerServer::runServer(int port) {
                     if(!jsonstr.empty()){
                         bool res = arm_verify(jsonstr);
                         send_message(client_fd, verifyMsg(armid, vrfid, res).c_str());
+                        if(!res){
+                            string controljsonstr = arm_control(jsonstr);
+                            appendToFile(controljsonstr, "json/control.json");
+                            if (!controljsonstr.empty()) {
+                                
+                                string cmdsendback = jsonToCmds(controljsonstr);
+                                send_message(client_fd, cmdsendback.c_str());
+                            }else{
+                                send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
+                            }
+                        }
+                    }else{
+                        send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
                     }
-                    // if (!jsonstr.empty() && !arm_verify(jsonstr)) {
-                    //     string controljsonstr = arm_control(jsonstr);
-                    //     appendToFile(controljsonstr, "json/control.json");
-
-                    //     if (!controljsonstr.empty()) {
-                    //         string cmdsendback = jsonToCmds(controljsonstr);
-                    //         send_message(client_fd, cmdsendback.c_str());
-                    //     }
-                    // } else {
-                    //     send_message(client_fd, "OK");
-                    // }
 
                     auto endtime = timenow();
                     appendToFile(to_string(endtime - starttime), "timeused.md");
@@ -69,7 +71,8 @@ void ArmControllerServer::runServer(int port) {
     close_connection(server_fd);
 }
 
-/*为原始status信息进行处理的总体函数，先输出一个格式能对接transCmds，后续可以考虑再结合*/
+/*为原始status信息进行处理的总体函数，先输出一个格式能对接transCmds，后续可以考虑再结合。
+目前的想法是把两个过程分开的好，方便修改，本身还是用现在的格式方便*/
 json ArmControllerServer::preprocessStateJson(string statusstr){
     json statusjson = json::parse(statusstr);
     int armid = statusjson["ArmId"];
@@ -99,7 +102,7 @@ json ArmControllerServer::preprocessStateJson(string statusstr){
                 vrfarm = arm;
             }
         }
-        if(vrfarm.empty()){
+        if(vrfarm.empty()){ //没有找到vrfarm，返回null
             return nullptr;
         }else{
             //计算指令起始的delay方便后续计算，后续只提供相对时间
@@ -522,6 +525,25 @@ string ArmControllerServer::generateCmd(const json& behavior) {
     return cmd;
 }
 
+string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const int vrfres){
+    string vrfmsg = "";
+    json jsonmsg;
+    jsonmsg["ArmId"] = armid;
+    jsonmsg["VrfId"] = vrfid;
+    jsonmsg["VrfRes"] = vrfres;
+    vrfmsg = jsonmsg.dump(4);
+    return vrfmsg;
+}
+
+string ArmControllerServer::controlMsg(const string& vrfjsonstr, const string& controljsonstr){
+    string controlmsg = "";
+    json jsonmsg = json::parse(vrfjsonstr);
+    json controljson = json::parse(controljsonstr);
+
+    controlmsg = jsonmsg.dump(4);
+    return controlmsg;
+}
+
 /*根据验证与控制生成的结果，将其重新封装为返回的cmd串。
 目前的格式不太美妙，可以继续设计，返回的串的格式很机械，
 就是按armId的顺序排的*/
@@ -561,15 +583,6 @@ string ArmControllerServer::jsonToCmds(const string& jsonString) {
     return cmdsback;
 }
 
-string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const int vrfres){
-    string vrfmsg = "";
-    json jsonmsg;
-    jsonmsg["ArmId"] = armid;
-    jsonmsg["VrfId"] = vrfid;
-    jsonmsg["VrfRes"] = vrfres;
-    vrfmsg = jsonmsg.dump(4);
-    return vrfmsg;
-}
 
 void ArmControllerServer::updateLocs(string cmd, float locs[]){
     istringstream stream(cmd);
