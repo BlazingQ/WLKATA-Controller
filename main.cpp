@@ -16,7 +16,7 @@ int main() {
 
     // cout << jsonstr << endl;
 
-    string controlresult = arm_control(statusstr, 0);
+    string controlresult = arm_control(statusstr, 3);
 
     cout << controlresult << endl;
 

@@ -45,7 +45,7 @@ void ArmControllerServer::runServer(int port) {
                         bool res = arm_verify(jsonstr);
                         send_message(client_fd, verifyMsg(armid, vrfid, res).c_str());
                         if(!res){
-                            string controljsonstr = arm_control(jsonstr);
+                            string controljsonstr = arm_control(jsonstr, armid);
                             appendToFile(controljsonstr, "json/control.json");
                             if (!controljsonstr.empty()) {
                                 
@@ -72,6 +72,7 @@ void ArmControllerServer::runServer(int port) {
 }
 
 /*为原始status信息进行处理的总体函数，先输出一个格式能对接transCmds，后续可以考虑再结合。
+这一步并没有改变输入的json格式，其arm仍然含有armid。
 目前的想法是把两个过程分开的好，方便修改，本身还是用现在的格式方便*/
 json ArmControllerServer::preprocessStateJson(string statusstr){
     json statusjson = json::parse(statusstr);
@@ -452,6 +453,7 @@ json ArmControllerServer::parseCommand(const string& cmd) {
 json ArmControllerServer::parseComponent(const json& singleArm, json& result){
     json component;
     int armindex = singleArm["ArmId"];
+    component["ArmId"] = armindex;
     string initialStateData = singleArm["Locs"];
     string commands = singleArm["Cmds"];
     if (armConfigs.find(armindex) != armConfigs.end()) {

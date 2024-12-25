@@ -7,6 +7,7 @@
     ],
     "Components": [
         {
+            "ArmId": 3,
             "BasePosition": [0, 0, 0],
             "InitialState": {
                 "Mode": "Cartesian",
