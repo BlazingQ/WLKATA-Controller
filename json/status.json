@@ -1,7 +1,7 @@
 {
     "Obstacles": [
         {
-            "X": [71.19, 163.67, 190.66],
+            "X": [1000,0,0],
             "Radius": 10
         }
     ],
@@ -14,10 +14,42 @@
                 "X": [183.67, 0, 230],
                 "R": [0, 0, 0]
             },
+            "Behavior": [
+                {
+                    "Mode": "Cartesian",
+                    "X": [0 ,160 ,185],
+                    "R": [0 ,0, 0],
+                    "Motion type": "Joint",
+                    "Speed": -1
+                }
+            ],
             "TargetState": {
                 "Mode": "Cartesian",
                 "X": [0, 160, 185],
+                "R": [0 ,0, 0]
+            }
+        },
+        {
+            "ArmId": 4,
+            "BasePosition": [0, 0, 0],
+            "InitialState": {
+                "Mode": "Cartesian",
+                "X": [71.19, 163.67, 190.66],
                 "R": [0, 0, 0]
+            },
+            "Behavior": [
+                {
+                    "Mode": "Cartesian",
+                    "X": [72, 163, 190],
+                    "R": [0 ,0, 0],
+                    "Motion type": "Joint",
+                    "Speed": -1
+                }
+            ],
+            "TargetState": {
+                "Mode": "Cartesian",
+                "X": [72, 163, 190],
+                "R": [0 ,0, 0]
             }
         }
     ]

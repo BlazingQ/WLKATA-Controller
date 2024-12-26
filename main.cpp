@@ -16,9 +16,11 @@ int main() {
 
     // cout << jsonstr << endl;
 
-    string controlresult = arm_control(statusstr, 3);
+    bool vrfres = arm_verify(statusstr);
 
-    cout << controlresult << endl;
+    // string controlresult = arm_control(statusstr, 3);
+
+    cout << vrfres << endl;
 
     return 0;
 }

@@ -46,6 +46,7 @@ public:
     ArmControllerServer();
     void runServer(int port);
     string transCmds(json arms);
+    bool verifyMultiArm(const string& jsonStr, int targetArmId); 
 };
 
 string doubleToStr(double value);

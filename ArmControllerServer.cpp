@@ -35,24 +35,23 @@ void ArmControllerServer::runServer(int port) {
                 //armid here is vrfarm, vrfid is vrfcmd
                 int armid = statusjson["ArmId"]; 
                 int vrfid = statusjson["VrfId"];
-                int isinit = statusjson["IsInit"];
                 json arms = preprocessStateJson(statusstr);
                 if(!arms.empty()){
                     appendToFile("\nprocessed status", "json/status.json");
                     appendToFile(arms.dump(4), "json/status.json");
                     string jsonstr = transCmds(arms); // 调用命令处理函数
                     if(!jsonstr.empty()){
-                        bool res = arm_verify(jsonstr);
-                        send_message(client_fd, verifyMsg(armid, vrfid, res).c_str());
+                        bool res = verifyMultiArm(jsonstr, armid);
+                        string vrfjsonstr = verifyMsg(armid, vrfid, res);
+                        // send_message(client_fd, verifyMsg(armid, vrfid, res).c_str());
                         if(!res){
                             string controljsonstr = arm_control(jsonstr, armid);
                             appendToFile(controljsonstr, "json/control.json");
                             if (!controljsonstr.empty()) {
-                                
-                                string cmdsendback = jsonToCmds(controljsonstr);
-                                send_message(client_fd, cmdsendback.c_str());
+                                // string cmdsendback = jsonToCmds(controljsonstr);
+                                send_message(client_fd, controlMsg(vrfjsonstr, controljsonstr).c_str());
                             }else{
-                                send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
+                                send_message(client_fd, vrfjsonstr.c_str());
                             }
                         }
                     }else{
@@ -69,6 +68,46 @@ void ArmControllerServer::runServer(int port) {
     }
 
     close_connection(server_fd);
+}
+
+/*封装arm_verify，将其验证两个机械臂安全的功能扩展到多机械臂*/
+bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId) {
+    json j = json::parse(jsonStr);
+    vector<json> components = j["Components"];
+    
+    // 找到目标机械臂的index
+    int targetIdx = -1;
+    for(size_t i = 0; i < components.size(); i++) {
+        if(components[i]["ArmId"] == targetArmId) {
+            targetIdx = i;
+            break;
+        }
+    }
+    
+    if(targetIdx == -1) {
+        cerr << "Target arm " << targetArmId << " not found" << endl;
+        return false;
+    }
+
+    // 对目标机械臂与其他每个机械臂进行两两验证
+    for(size_t i = 0; i < components.size(); i++) {
+        if(i == targetIdx) continue;
+        
+        // 构造仅包含两个机械臂的json
+        json pairJson;
+        pairJson["Obstacles"] = j["Obstacles"];
+        pairJson["Components"] = json::array();
+        pairJson["Components"].push_back(components[targetIdx]);
+        pairJson["Components"].push_back(components[i]);
+        
+        // 使用现有的arm_verify进行验证
+        bool res = arm_verify(pairJson.dump());
+        if(!res) {
+            return false; // 如果任何一对验证失败就返回false
+        }
+    }
+    
+    return true; // 所有验证都通过
 }
 
 /*为原始status信息进行处理的总体函数，先输出一个格式能对接transCmds，后续可以考虑再结合。
@@ -182,7 +221,7 @@ pair<pair<int, int>, json> ArmControllerServer::getVrfArmInfo(json armjson, int 
     string vrfcmd;
     int starttime = 0;
     int duration;
-    for(int i = 0; i < cmdList.size(); ++i) {
+    for(size_t i = 0; i < cmdList.size(); ++i) {
         string cmd = cmdList[i];
         if (!cmd.empty()) {
             if(i + startid < vrfid){
@@ -248,7 +287,7 @@ pair<int, json> ArmControllerServer::getOtherArmInfo(json armjson, pair<int, int
     //另外有一种匹配思路是，先求每一条指令的区间，然后写一个算法专门看两个区间是否匹配，这样匹配一定不出错。
     //但是后续看cmds和locs还是一样麻烦。
     if(curtime < vrfend){//否则就是空
-        for(int i = 0; i < cmdList.size(); ++i) {
+        for(size_t i = 0; i < cmdList.size(); ++i) {
             string cmd = cmdList[i];
             int duration = durationList[i];
             if (!cmd.empty()) {
