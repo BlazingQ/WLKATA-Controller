@@ -1,0 +1,137 @@
+{
+    "Components": [
+        {
+            "ArmId": 4,
+            "BasePosition": [
+                800.0,
+                -230.0,
+                0.0
+            ],
+            "Behavior": [
+                {
+                    "Mode": "Cartesian",
+                    "Motion type": "Linear",
+                    "R": [
+                        0.0,
+                        -25.0,
+                        90.0
+                    ],
+                    "Speed": 2000.0000000000002,
+                    "X": [
+                        -10.00000000000003,
+                        198.00000000000003,
+                        165.0
+                    ]
+                }
+            ],
+            "Delay": 0.0,
+            "InitialState": {
+                "Mode": "Cartesian",
+                "R": [
+                    0.0,
+                    -25.0,
+                    90.0
+                ],
+                "X": [
+                    -10.0,
+                    198.0,
+                    145.0
+                ]
+            }
+        },
+        {
+            "ArmId": 5,
+            "BasePosition": [
+                1600.0,
+                -230.0,
+                0.0
+            ],
+            "Behavior": [
+                {
+                    "Mode": "Cartesian",
+                    "Motion type": "Joint",
+                    "R": [
+                        0.0,
+                        0.1,
+                        90.0
+                    ],
+                    "Speed": -1,
+                    "X": [
+                        0.0999999,
+                        173.0,
+                        115.1
+                    ]
+                },
+                {
+                    "Mode": "Cartesian",
+                    "Motion type": "Joint",
+                    "R": [
+                        0.0,
+                        0.1,
+                        90.0
+                    ],
+                    "Speed": -1,
+                    "X": [
+                        25.1,
+                        173.0,
+                        114.8
+                    ]
+                },
+                {
+                    "Mode": "Cartesian",
+                    "Motion type": "Joint",
+                    "R": [
+                        0.0,
+                        0.1,
+                        90.0
+                    ],
+                    "Speed": -1,
+                    "X": [
+                        29.9,
+                        172.9,
+                        109.5
+                    ]
+                },
+                {
+                    "Mode": "Cartesian",
+                    "Motion type": "Joint",
+                    "R": [
+                        0.0,
+                        0.1,
+                        90.0
+                    ],
+                    "Speed": -1,
+                    "X": [
+                        25.1,
+                        178.6,
+                        114.8
+                    ]
+                }
+            ],
+            "Delay": 0.0,
+            "InitialState": {
+                "Mode": "Cartesian",
+                "R": [
+                    0.0,
+                    0.0,
+                    90.0
+                ],
+                "X": [
+                    10.0,
+                    173.0,
+                    108.800003
+                ]
+            }
+        }
+    ],
+    "Obstacles": [
+        {
+            "Radius": 10.0,
+            "X": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        }
+    ]
+}

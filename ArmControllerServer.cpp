@@ -70,6 +70,37 @@ void ArmControllerServer::runServer(int port) {
     close_connection(server_fd);
 }
 
+void ArmControllerServer::testRun(string statusstr) {
+    auto starttime = timenow();
+    overwriteToFile("", "json/control.json");
+    overwriteToFile("", "json/status.json");
+    appendToFile("\noringinal status:", "json/status.json");
+    appendToFile(statusstr, "json/status.json");
+    json statusjson = json::parse(statusstr);
+    //armid here is vrfarm, vrfid is vrfcmd
+    int armid = statusjson["ArmId"]; 
+    int vrfid = statusjson["VrfId"];
+    json arms = preprocessStateJson(statusstr);
+    if(!arms.empty()){
+        appendToFile("\nprocessed status", "json/status.json");
+        appendToFile(arms.dump(4), "json/status.json");
+        string jsonstr = transCmds(arms); // 调用命令处理函数
+        if(!jsonstr.empty()){
+            // bool res = verifyMultiArm(jsonstr, armid);
+            // string vrfjsonstr = verifyMsg(armid, vrfid, res);
+            // if(!res){
+            //     string controljsonstr = arm_control(jsonstr, armid);
+            //     appendToFile(controljsonstr, "json/control.json");
+            // }
+                string controljsonstr = arm_control(jsonstr, armid);
+                appendToFile(controljsonstr, "json/control.json");
+        }
+    }
+    auto endtime = timenow();
+    appendToFile(to_string(endtime - starttime), "timeused.md");
+    return ;
+}
+
 /*封装arm_verify，将其验证两个机械臂安全的功能扩展到多机械臂*/
 bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId) {
     json j = json::parse(jsonStr);
@@ -576,11 +607,28 @@ string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const in
     return vrfmsg;
 }
 
+
 string ArmControllerServer::controlMsg(const string& vrfjsonstr, const string& controljsonstr){
     string controlmsg = "";
     json jsonmsg = json::parse(vrfjsonstr);
     json controljson = json::parse(controljsonstr);
 
+    string cmds;
+    for(const auto& component: controljson["Components"]){
+        if(component["ArmId"] == jsonmsg["ArmId"]){
+            for(const auto& behavior: component["Behavior"]){
+                if(!cmds.empty()){
+                    cmds += ",";
+                }
+                cmds += generateCmd(behavior);
+            }
+        }
+    }
+
+    //很不严谨的操作，并没有检查对应armid的component是否存在，只是通过cmds是否为空简单判断
+    if(!cmds.empty()){
+        jsonmsg["Cmds"] = cmds;
+    }
     controlmsg = jsonmsg.dump(4);
     return controlmsg;
 }

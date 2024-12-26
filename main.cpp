@@ -3,24 +3,19 @@
 
 int main() {
     ArmControllerServer server;
-    int port = 12345;  // 你可以指定你的服务器端口
-
-    // std::cout << "Starting Arm Controller Server on port " << port << "..." << std::endl;
+    string statusstr = readFile("json/testinput.json");
+    server.testRun(statusstr);
+    // int port = 12345;  // 你可以指定你的服务器端口
     
     // server.runServer(port);  // 启动服务器并运行
 
-    string statusstr = readFile("json/status.json");
-    // json statusjson = json::parse(statusstr);
+    // string statusstr = readFile("json/status.json");
 
-    // string jsonstr = server.transCmds(statusjson);
-
-    // cout << jsonstr << endl;
-
-    bool vrfres = arm_verify(statusstr);
+    // // bool vrfres = server.verifyMultiArm(statusstr, 4);
+    // // cout << vrfres << endl;
 
     // string controlresult = arm_control(statusstr, 3);
-
-    cout << vrfres << endl;
+    // cout << controlresult << endl;
 
     return 0;
 }

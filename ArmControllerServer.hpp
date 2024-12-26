@@ -45,6 +45,7 @@ private:
 public:
     ArmControllerServer();
     void runServer(int port);
+    void testRun(string statusstr);
     string transCmds(json arms);
     bool verifyMultiArm(const string& jsonStr, int targetArmId); 
 };
