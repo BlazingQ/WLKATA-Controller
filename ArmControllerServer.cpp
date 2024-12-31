@@ -43,7 +43,6 @@ void ArmControllerServer::runServer(int port) {
                     if(!jsonstr.empty()){
                         bool res = verifyMultiArm(jsonstr, armid);
                         string vrfjsonstr = verifyMsg(armid, vrfid, res);
-                        // send_message(client_fd, verifyMsg(armid, vrfid, res).c_str());
                         if(!res){
                             string controljsonstr = arm_control(jsonstr, armid);
                             appendToFile(controljsonstr, "json/control.json");
@@ -53,6 +52,8 @@ void ArmControllerServer::runServer(int port) {
                             }else{
                                 send_message(client_fd, vrfjsonstr.c_str());
                             }
+                        } else{
+                            send_message(client_fd, vrfjsonstr.c_str());
                         }
                     }else{
                         send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
@@ -86,14 +87,16 @@ void ArmControllerServer::testRun(string statusstr) {
         appendToFile(arms.dump(4), "json/status.json");
         string jsonstr = transCmds(arms); // 调用命令处理函数
         if(!jsonstr.empty()){
-            // bool res = verifyMultiArm(jsonstr, armid);
-            // string vrfjsonstr = verifyMsg(armid, vrfid, res);
+            bool res = verifyMultiArm(jsonstr, armid);
+            string vrfjsonstr = verifyMsg(armid, vrfid, res);
+            cout<<"vrfjsonstr: "<<vrfjsonstr<<endl;
             // if(!res){
             //     string controljsonstr = arm_control(jsonstr, armid);
             //     appendToFile(controljsonstr, "json/control.json");
             // }
-                string controljsonstr = arm_control(jsonstr, armid);
-                appendToFile(controljsonstr, "json/control.json");
+                // string controljsonstr = arm_control(jsonstr, armid);
+                // string controlmsg = controlMsg(verifyMsg(armid, vrfid, 0), controljsonstr);
+                // appendToFile(controlmsg, "json/control.json");
         }
     }
     auto endtime = timenow();
@@ -120,10 +123,10 @@ bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId)
         return false;
     }
 
-    // 对目标机械臂与其他每个机械臂进行两两验证
+    // 对目标机械臂与其他ID大于它的机械臂进行验证
     for(size_t i = 0; i < components.size(); i++) {
-        if(i == targetIdx) continue;
-        
+        if(components[i]["ArmId"] <= targetArmId ) continue;
+        cout <<"compare main arm "<<targetIdx<<" with arm "<<i<<endl;
         // 构造仅包含两个机械臂的json
         json pairJson;
         pairJson["Obstacles"] = j["Obstacles"];
@@ -603,6 +606,8 @@ string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const in
     jsonmsg["ArmId"] = armid;
     jsonmsg["VrfId"] = vrfid;
     jsonmsg["VrfRes"] = vrfres;
+    jsonmsg["Time"] = timenow(); //time used to compare verify sequence
+    jsonmsg["Cmds"] = "";
     vrfmsg = jsonmsg.dump(4);
     return vrfmsg;
 }
@@ -884,7 +889,7 @@ void ArmControllerServer::initializeArmConfigs() {
         {"BasePosition", {0, 230, 0}},
         {"Obstacles", 
             {
-                {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}
+               
         
             }
         }
@@ -893,7 +898,7 @@ void ArmControllerServer::initializeArmConfigs() {
         {"BasePosition", {420, 230, 0}},
         {"Obstacles", 
             {
-                {{"X", {71.19, 163.67, 190.66}}, {"Radius", 10}}
+                
         
             }
         }
@@ -920,7 +925,7 @@ void ArmControllerServer::initializeArmConfigs() {
         {"BasePosition", {1600, -230, 0}},
         {"Obstacles", 
             {
-                {{"X", {0, 0, 0}}, {"Radius", 10}}
+               
             
             }
         }
