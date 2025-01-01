@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <thread>
 #include <sstream>
 #include <map>
 #include <unordered_map>
@@ -54,7 +55,7 @@ string doubleToStr(double value);
 void overwriteToFile(const string& str, const string& filename);
 string readFile(const string& filename);
 void appendToFile(const string& str, const string& filename);
-long long int timenow();
+std::string timenow();
 vector<string> decodeCommaStr(const string& commands, int startIndex, int length);
 vector<int> commaStrtoInt(const string& commands, int startIndex, int length);
 string subCommaStr(const string& commands, int startIndex, int length);

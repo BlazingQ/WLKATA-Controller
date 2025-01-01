@@ -41,13 +41,14 @@ void ArmControllerServer::runServer(int port) {
                     appendToFile(arms.dump(4), "json/status.json");
                     string jsonstr = transCmds(arms); // 调用命令处理函数
                     if(!jsonstr.empty()){
-                        bool res = verifyMultiArm(jsonstr, armid);
+                        // bool res = verifyMultiArm(jsonstr, armid);
+                        bool res = false;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
                         string vrfjsonstr = verifyMsg(armid, vrfid, res);
                         if(!res){
                             string controljsonstr = arm_control(jsonstr, armid);
                             appendToFile(controljsonstr, "json/control.json");
                             if (!controljsonstr.empty()) {
-                                // string cmdsendback = jsonToCmds(controljsonstr);
                                 send_message(client_fd, controlMsg(vrfjsonstr, controljsonstr).c_str());
                             }else{
                                 send_message(client_fd, vrfjsonstr.c_str());
@@ -60,7 +61,7 @@ void ArmControllerServer::runServer(int port) {
                     }
 
                     auto endtime = timenow();
-                    appendToFile(to_string(endtime - starttime), "timeused.md");
+                    appendToFile(to_string(stoll(endtime) - stoll(starttime)), "timeused.md");
                 }
             }
         }
@@ -100,7 +101,7 @@ void ArmControllerServer::testRun(string statusstr) {
         }
     }
     auto endtime = timenow();
-    appendToFile(to_string(endtime - starttime), "timeused.md");
+    appendToFile(to_string(stoll(endtime) - stoll(starttime)), "timeused.md");
     return ;
 }
 
@@ -626,6 +627,11 @@ string ArmControllerServer::controlMsg(const string& vrfjsonstr, const string& c
                     cmds += ",";
                 }
                 cmds += generateCmd(behavior);
+                //test for 2 control cmds
+                if(!cmds.empty()){  
+                    cmds += ",";
+                }
+                cmds += generateCmd(behavior);
             }
         }
     }
@@ -775,11 +781,11 @@ string readFile(const string& filename) {
     return str;
 }
 
-long long int timenow(){
+std::string timenow(){
     auto now = chrono::high_resolution_clock::now();
     auto duration_since_epoch = now.time_since_epoch();
     long long int millis = chrono::duration_cast<chrono::milliseconds>(duration_since_epoch).count();
-    return millis;
+    return to_string(millis);
 }
 
 void appendToFile(const string& str, const string& filename) {
