@@ -28,6 +28,7 @@ private:
     vector<double> locs;
     bool isincre;
     bool isangle;
+    string lastControlTime;
 
     // 私有成员函数
     json preprocessStateJson(string statusstr);
@@ -46,7 +47,7 @@ private:
 public:
     ArmControllerServer();
     void runServer(int port);
-    void testRun(string statusstr);
+    void oneRun(string statusstr, int client_fd = 0, bool istest = true);
     string transCmds(json arms);
     bool verifyMultiArm(const string& jsonStr, int targetArmId); 
 };

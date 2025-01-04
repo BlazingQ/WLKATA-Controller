@@ -2,12 +2,12 @@
 
 ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
     initializeArmConfigs();
+    lastControlTime = timenow();
 }
 
 void ArmControllerServer::runServer(int port) {
     overwriteToFile("", "json/control.json");
     overwriteToFile("", "json/status.json");
-    // overwriteToFile("", "json/finalstatus.json");
 
     int server_fd = setup_server(port);
     if (server_fd < 0) {
@@ -24,45 +24,47 @@ void ArmControllerServer::runServer(int port) {
 
         char buffer[4096] = {0};
         if (receive_message(client_fd, buffer, 4096)) {
-            auto starttime = timenow();
+            // auto starttime = timenow();
             string statusstr = buffer;
             if(statusstr.empty() || statusstr[0] == '^' ){
-                send_message(client_fd, verifyMsg(0, 0, 0).c_str());
+                send_message(client_fd, "");
             }else{
-                appendToFile("\noringinal status:", "json/status.json");
-                appendToFile(statusstr, "json/status.json");
-                json statusjson = json::parse(statusstr);
-                //armid here is vrfarm, vrfid is vrfcmd
-                int armid = statusjson["ArmId"]; 
-                int vrfid = statusjson["VrfId"];
-                json arms = preprocessStateJson(statusstr);
-                if(!arms.empty()){
-                    appendToFile("\nprocessed status", "json/status.json");
-                    appendToFile(arms.dump(4), "json/status.json");
-                    string jsonstr = transCmds(arms); // 调用命令处理函数
-                    if(!jsonstr.empty()){
-                        // bool res = verifyMultiArm(jsonstr, armid);
-                        bool res = false;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
-                        string vrfjsonstr = verifyMsg(armid, vrfid, res);
-                        if(!res){
-                            string controljsonstr = arm_control(jsonstr, armid);
-                            appendToFile(controljsonstr, "json/control.json");
-                            if (!controljsonstr.empty()) {
-                                send_message(client_fd, controlMsg(vrfjsonstr, controljsonstr).c_str());
-                            }else{
-                                send_message(client_fd, vrfjsonstr.c_str());
-                            }
-                        } else{
-                            send_message(client_fd, vrfjsonstr.c_str());
-                        }
-                    }else{
-                        send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
-                    }
+                oneRun(statusstr, client_fd, false);
+                // appendToFile("\noringinal status:", "json/status.json");
+                // appendToFile(statusstr, "json/status.json");
+                // json statusjson = json::parse(statusstr);
+                // //armid here is vrfarm, vrfid is vrfcmd
+                // int armid = statusjson["ArmId"]; 
+                // int vrfid = statusjson["VrfId"];
+                // json arms = preprocessStateJson(statusstr);
+                // if(!arms.empty()){
+                //     appendToFile("\nprocessed status", "json/status.json");
+                //     appendToFile(arms.dump(4), "json/status.json");
+                //     string jsonstr = transCmds(arms); // 调用命令处理函数
+                //     if(!jsonstr.empty()){
+                //         // bool res = verifyMultiArm(jsonstr, armid);
+                //         bool res = true;
+                //         std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
+                //         string vrfjsonstr = verifyMsg(armid, vrfid, res);
+                //         if(!res){
+                //             string controljsonstr = arm_control(jsonstr, armid);
+                //             appendToFile(controljsonstr, "json/control.json");
+                //             if (!controljsonstr.empty()) {
+                //                 lastControlTime = timenow();
+                //                 send_message(client_fd, controlMsg(vrfjsonstr, controljsonstr).c_str());
+                //             }else{
+                //                 send_message(client_fd, vrfjsonstr.c_str());
+                //             }
+                //         } else{
+                //             send_message(client_fd, vrfjsonstr.c_str());
+                //         }
+                //     }else{
+                //         send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
+                //     }
 
-                    auto endtime = timenow();
-                    appendToFile(to_string(stoll(endtime) - stoll(starttime)), "timeused.md");
-                }
+                //     auto endtime = timenow();
+                //     appendToFile(to_string(stoll(endtime) - stoll(starttime)), "timeused.md");
+                // }
             }
         }
 
@@ -72,7 +74,7 @@ void ArmControllerServer::runServer(int port) {
     close_connection(server_fd);
 }
 
-void ArmControllerServer::testRun(string statusstr) {
+void ArmControllerServer::oneRun(string statusstr, int client_fd = 0, bool istest = true) {
     auto starttime = timenow();
     overwriteToFile("", "json/control.json");
     overwriteToFile("", "json/status.json");
@@ -82,28 +84,68 @@ void ArmControllerServer::testRun(string statusstr) {
     //armid here is vrfarm, vrfid is vrfcmd
     int armid = statusjson["ArmId"]; 
     int vrfid = statusjson["VrfId"];
-    json arms = preprocessStateJson(statusstr);
-    if(!arms.empty()){
-        appendToFile("\nprocessed status", "json/status.json");
-        appendToFile(arms.dump(4), "json/status.json");
-        string jsonstr = transCmds(arms); // 调用命令处理函数
-        if(!jsonstr.empty()){
-            bool res = verifyMultiArm(jsonstr, armid);
-            string vrfjsonstr = verifyMsg(armid, vrfid, res);
-            cout<<"vrfjsonstr: "<<vrfjsonstr<<endl;
-            // if(!res){
-            //     string controljsonstr = arm_control(jsonstr, armid);
-            //     appendToFile(controljsonstr, "json/control.json");
-            // }
-                // string controljsonstr = arm_control(jsonstr, armid);
-                // string controlmsg = controlMsg(verifyMsg(armid, vrfid, 0), controljsonstr);
-                // appendToFile(controlmsg, "json/control.json");
+    string currenttime = statusjson["CurrentTime"];
+
+    //think status constructed before lastControlTime is not secure
+    if(stoll(currenttime) <= stoll(lastControlTime)){
+        if(!istest)
+            send_message(client_fd, verifyMsg(armid, vrfid, -1).c_str());
+        else
+            cout<< "vrfmsgstr = "<< verifyMsg(armid, vrfid, -1) <<endl;
+    } else{
+        json arms = preprocessStateJson(statusstr);
+
+        //arms/jsonstr isempty is not considered to occur
+        if(!arms.empty()){
+            appendToFile("\nprocessed status", "json/status.json");
+            appendToFile(arms.dump(4), "json/status.json");
+            string jsonstr = transCmds(arms); // 调用命令处理函数
+            if(!jsonstr.empty()){
+                // bool res = verifyMultiArm(jsonstr, armid);
+                bool res = true;
+                std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
+                string vrfmsgstr = verifyMsg(armid, vrfid, res);
+                if(!res){
+                    string controljsonstr = arm_control(jsonstr, armid);
+                    appendToFile(controljsonstr, "json/control.json");
+                    if (!controljsonstr.empty()) {
+                        string controlmsgstr = controlMsg(vrfmsgstr, controljsonstr);
+                        lastControlTime = timenow();
+                        if(!istest)
+                            send_message(client_fd, controlmsgstr.c_str());
+                        else
+                            cout << "controlmsgstr = "<< controlmsgstr<<endl;
+                    }else{
+                        if(!istest)
+                            send_message(client_fd, vrfmsgstr.c_str());
+                        else
+                            cout << "vrfmsgstr = "<< vrfmsgstr<<endl;
+                    }
+                } else{
+                    if(!istest)
+                        send_message(client_fd, vrfmsgstr.c_str());
+                    else
+                        cout << "vrfmsgstr = "<< vrfmsgstr<<endl;
+                }
+            }else{
+                if(!istest)
+                    send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
+                else
+                    cout << "vrfmsgstr = "<< verifyMsg(armid, vrfid, 0) <<endl;
+            }
+        }else{
+            if(!istest)
+                send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
+            else
+                cout << "vrfmsgstr = "<< verifyMsg(armid, vrfid, 0) <<endl;
         }
     }
     auto endtime = timenow();
     appendToFile(to_string(stoll(endtime) - stoll(starttime)), "timeused.md");
     return ;
 }
+
+
 
 /*封装arm_verify，将其验证两个机械臂安全的功能扩展到多机械臂*/
 bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId) {
@@ -606,8 +648,13 @@ string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const in
     json jsonmsg;
     jsonmsg["ArmId"] = armid;
     jsonmsg["VrfId"] = vrfid;
-    jsonmsg["VrfRes"] = vrfres;
-    jsonmsg["Time"] = timenow(); //time used to compare verify sequence
+    if(vrfres){
+        jsonmsg["VrfRes"] = 1;
+    }
+    else{
+        jsonmsg["VrfRes"] = 0;
+    }
+    jsonmsg["Time"] = timenow(); //time used to compare verify sequence, maybe useless now
     jsonmsg["Cmds"] = "";
     vrfmsg = jsonmsg.dump(4);
     return vrfmsg;
