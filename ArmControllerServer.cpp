@@ -86,14 +86,14 @@ void ArmControllerServer::testRun(string statusstr) {
         appendToFile(arms.dump(4), "json/status.json");
         string jsonstr = transCmds(arms); // 调用命令处理函数
         if(!jsonstr.empty()){
-            // bool res = verifyMultiArm(jsonstr, armid);
-            // string vrfjsonstr = verifyMsg(armid, vrfid, res);
-            // if(!res){
-            //     string controljsonstr = arm_control(jsonstr, armid);
-            //     appendToFile(controljsonstr, "json/control.json");
-            // }
+            bool res = verifyMultiArm(jsonstr, armid);
+            string vrfjsonstr = verifyMsg(armid, vrfid, res);
+            if(!res){
                 string controljsonstr = arm_control(jsonstr, armid);
                 appendToFile(controljsonstr, "json/control.json");
+            }
+                // string controljsonstr = arm_control(jsonstr, armid);
+                // appendToFile(controljsonstr, "json/control.json");
         }
     }
     auto endtime = timenow();
