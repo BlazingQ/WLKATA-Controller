@@ -2,6 +2,7 @@
 	"ArmId":	4,
 	"VrfId":	3,
 	"IsInit":	0,
+	"CurrentTime": "",
 	"Arms":	[{
 			"ArmId":	5,
 			"CmdId":	1,

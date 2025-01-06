@@ -74,7 +74,7 @@ void ArmControllerServer::runServer(int port) {
     close_connection(server_fd);
 }
 
-void ArmControllerServer::oneRun(string statusstr, int client_fd = 0, bool istest = true) {
+void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
     auto starttime = timenow();
     overwriteToFile("", "json/control.json");
     overwriteToFile("", "json/status.json");
@@ -87,7 +87,7 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd = 0, bool istes
     string currenttime = statusjson["CurrentTime"];
 
     //think status constructed before lastControlTime is not secure
-    if(stoll(currenttime) <= stoll(lastControlTime)){
+    if(!istest && (stoll(currenttime) <= stoll(lastControlTime))){
         if(!istest)
             send_message(client_fd, verifyMsg(armid, vrfid, -1).c_str());
         else
@@ -101,9 +101,9 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd = 0, bool istes
             appendToFile(arms.dump(4), "json/status.json");
             string jsonstr = transCmds(arms); // 调用命令处理函数
             if(!jsonstr.empty()){
-                // bool res = verifyMultiArm(jsonstr, armid);
-                bool res = true;
-                std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
+                bool res = verifyMultiArm(jsonstr, armid);
+                // bool res = true;
+                // std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
                 string vrfmsgstr = verifyMsg(armid, vrfid, res);
                 if(!res){
                     string controljsonstr = arm_control(jsonstr, armid);
