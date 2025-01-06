@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <thread>
 #include <sstream>
 #include <map>
 #include <unordered_map>
@@ -27,6 +28,7 @@ private:
     vector<double> locs;
     bool isincre;
     bool isangle;
+    string lastControlTime;
 
     // 私有成员函数
     json preprocessStateJson(string statusstr);
@@ -45,7 +47,7 @@ private:
 public:
     ArmControllerServer();
     void runServer(int port);
-    void testRun(string statusstr);
+    void oneRun(string statusstr, int client_fd = 0, bool istest = true);
     string transCmds(json arms);
     bool verifyMultiArm(const string& jsonStr, int targetArmId); 
 };
@@ -54,7 +56,7 @@ string doubleToStr(double value);
 void overwriteToFile(const string& str, const string& filename);
 string readFile(const string& filename);
 void appendToFile(const string& str, const string& filename);
-long long int timenow();
+std::string timenow();
 vector<string> decodeCommaStr(const string& commands, int startIndex, int length);
 vector<int> commaStrtoInt(const string& commands, int startIndex, int length);
 string subCommaStr(const string& commands, int startIndex, int length);
