@@ -84,15 +84,23 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
     //armid here is vrfarm, vrfid is vrfcmd
     int armid = statusjson["ArmId"]; 
     int vrfid = statusjson["VrfId"];
-    string currenttime = statusjson["CurrentTime"];
+    int isinit = statusjson["IsInit"];
+    // string constructtime = statusjson["ConstructTime"];
 
     //think status constructed before lastControlTime is not secure
-    if(!istest && (stoll(currenttime) <= stoll(lastControlTime))){
+    // if(!istest && (stoll(constructtime) <= stoll(lastControlTime))){
+    if(false){
         if(!istest)
             send_message(client_fd, verifyMsg(armid, vrfid, -1).c_str());
         else
             cout<< "vrfmsgstr = "<< verifyMsg(armid, vrfid, -1) <<endl;
-    } else{
+    } else if(isinit){ //considering time complexity, ignore init verify
+        if(!istest)
+            send_message(client_fd, verifyMsg(armid, vrfid, 1).c_str());
+        else
+            cout << "vrfmsgstr = "<< verifyMsg(armid, vrfid, 1) <<endl;
+
+    }else {
         json arms = preprocessStateJson(statusstr);
 
         //arms/jsonstr isempty is not considered to occur
@@ -134,6 +142,7 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
                     cout << "vrfmsgstr = "<< verifyMsg(armid, vrfid, 0) <<endl;
             }
         }else{
+            appendToFile("\nempty arms", "json/status.json");
             if(!istest)
                 send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
             else
