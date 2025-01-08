@@ -76,8 +76,6 @@ void ArmControllerServer::runServer(int port) {
 
 void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
     auto starttime = timenow();
-    overwriteToFile("", "json/control.json");
-    overwriteToFile("", "json/status.json");
     appendToFile("\noringinal status:", "json/status.json");
     appendToFile(statusstr, "json/status.json");
     json statusjson = json::parse(statusstr);
@@ -105,7 +103,7 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
 
         //arms/jsonstr isempty is not considered to occur
         if(!arms.empty()){
-            appendToFile("\nprocessed status", "json/status.json");
+            appendToFile("\nprocessed status:", "json/status.json");
             appendToFile(arms.dump(4), "json/status.json");
             string jsonstr = transCmds(arms); // 调用命令处理函数
             if(!jsonstr.empty()){
@@ -142,7 +140,6 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
                     cout << "vrfmsgstr = "<< verifyMsg(armid, vrfid, 0) <<endl;
             }
         }else{
-            appendToFile("\nempty arms", "json/status.json");
             if(!istest)
                 send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
             else
@@ -177,8 +174,12 @@ bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId)
 
     // 对目标机械臂与其他ID大于它的机械臂进行验证
     for(size_t i = 0; i < components.size(); i++) {
-        if(components[i]["ArmId"] <= targetArmId ) continue;
-        cout <<"compare main arm "<<targetIdx<<" with arm "<<i<<endl;
+        if(components[i]["ArmId"] <= targetArmId ){
+            if(components[i]["ArmId"] < targetArmId)
+                cout<<"no need to compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
+            continue;
+        }
+        cout <<"compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
         // 构造仅包含两个机械臂的json
         json pairJson;
         pairJson["Obstacles"] = j["Obstacles"];
@@ -297,12 +298,6 @@ pair<pair<int, int>, json> ArmControllerServer::getVrfArmInfo(json armjson, int 
     vector<string> cmdList = decodeCommaStr(cmds, 0, INT_MAX);
     vector<int> durationList = commaStrtoInt(durations, 0, INT_MAX);
     assert(cmdList.size() == durationList.size());
-    
-    // 检查 cmdId 的有效性
-    int cmdIndex = vrfid - startid; // 计算 Cmds 中的索引
-    if (cmdIndex < 0 || cmdIndex >= static_cast<int>(cmdList.size())) {
-        throw invalid_argument("Invalid CmdId provided.");
-    }
     
     string vrfcmd;
     int starttime = 0;

@@ -60,11 +60,11 @@ bool receive_message(int sock, char* buffer, size_t buffer_size) {
         return false;
     }
     buffer[bytes_received] = '\0'; // Ensure null-termination
-    std::cout << "Received: " << buffer << std::endl;
+    // std::cout << "Received: " << buffer << std::endl;
     return true;
 }
 
  void close_connection(int sock) {
     close(sock);
-    std::cout << "Connection closed." << std::endl;
+    // std::cout << "Connection closed." << std::endl;
 }
