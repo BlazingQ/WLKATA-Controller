@@ -1,21 +1,66 @@
 {
-	"ArmId":	3,
-	"VrfId":	5,
-	"IsInit":	0,
-	"ConstructTime":	"1736430532521",
-	"Arms":	[{
-			"ArmId":	3,
-			"CmdId":	3,
-			"Cmds":	"M20 G91 G01 X0 Y0 Z20 A0 B0 C0 F2000,M20 G90 G00 X10 Y-195 Z170 A0 B-25 C-90 F2000,M20 G91 G01 X0 Y0 Z-20 A0 B0 C0 F2000,M20 G91 G01 X0 Y0 Z20 A0 B0 C0 F2000,M20 G90 G00 X25 Y-195 Z170 A0 B-25 C-90 F2000,M20 G91 G01 X0 Y0 Z-20 A0 B0 C0 F2000,M20 G91 G01 X0 Y0 Z20 A0 B0 C0 F2000,M20 G90 G00 X183.67 Y0 Z230 A0 B0 C0 F2000",
-			"Durations":	"1029,1022,1029,1028,1021,1029,1028,1024",
-			"Locs":	"-5,-195,150,0,-25,-90",
-			"StartTime":	"1736430532460"
-		}, {
-			"ArmId":	4,
-			"CmdId":	3,
-			"Cmds":	"M20 G91 G01 X0 Y0 Z20 A0 B0 C0 F2000,M20 G90 G00 X5 Y198 Z165 A0 B-25 C90 F2000,M20 G91 G01 X0 Y0 Z-20 A0 B0 C0 F2000,M20 G91 G01 X0 Y0 Z20 A0 B0 C0 F2000,M20 G90 G00 X20 Y198 Z165 A0 B-25 C90 F2000,M20 G91 G01 X0 Y0 Z-20 A0 B0 C0 F2000,M20 G91 G01 X0 Y0 Z20 A0 B0 C0 F2000,M21 G90 X0 Y0 Z0 A0 B0 C0 F2000",
-			"Durations":	"1029,1021,1029,1030,1021,1030,1029,2012",
-			"Locs":	"-10,198,145,0,-25,90",
-			"StartTime":	"1736430532473"
-		}]
+    "Obstacles": [
+    ],
+    "Components": [
+        {
+            "ArmId": 3,
+            "BasePosition": [0, -207, 0],
+            "InitialState": {
+                "Mode": "Cartesian",
+                "X": [183.67, 0, 230],
+                "R": [0, 0, 0]
+            },
+            "Behavior": [
+                {
+                    "Mode": "Cartesian",
+                    "X": [183.67 ,0 ,230],
+                    "R": [0, 0, 0],
+                    "Motion type": "Joint",
+                    "Speed": -1
+                },
+                {
+                    "Mode": "Cartesian",
+                    "X": [0 ,160 ,185],
+                    "R": [0 ,-25 ,90],
+                    "Motion type": "Joint",
+                    "Speed": -1
+                }
+            ],
+            "TargetState": {
+                "Mode": "Cartesian",
+                "X": [0, 160, 185],
+                "R": [0 ,-25 ,90]
+            }
+        },
+        {
+            "ArmId": 4,
+            "BasePosition": [0, 207, 0],
+            "InitialState": {
+                "Mode": "Cartesian",
+                "X": [183.67, 0, 230],
+                "R": [0, 0, 0]
+            },
+            "Behavior": [
+                {
+                    "Mode": "Cartesian",
+                    "X": [183.67 ,0 ,230],
+                    "R": [0, 0, 0],
+                    "Motion type": "Joint",
+                    "Speed": -1
+                },
+                {
+                    "Mode": "Cartesian",
+                    "X": [0 ,-160 ,185],
+                    "R": [0 ,-25 ,-90],
+                    "Motion type": "Joint",
+                    "Speed": -1
+                }
+            ],
+            "TargetState": {
+                "Mode": "Cartesian",
+                "X": [0, -160, 185],
+                "R": [0 ,-25 ,-90]
+            }
+        }
+    ]
 }

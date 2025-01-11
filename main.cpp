@@ -7,13 +7,13 @@ int main() {
     
     // server.runServer(port);  // 启动服务器并运行
 
-    overwriteToFile("", "json/control.json");
-    overwriteToFile("", "json/status.json");
-    overwriteToFile("", "timeused.md");
     string statusstr = readFile("json/testinput.json");
-    server.oneRun(statusstr, 0, true);
-    // bool vrfres = arm_verify(statusstr);
+    // overwriteToFile("", "json/control.json");
+    // overwriteToFile("", "json/status.json");
+    // overwriteToFile("", "timeused.md");
+    // server.oneRun(statusstr, 0, true);
 
+    bool vrfres = arm_verify(statusstr);
     // bool vrfres = server.verifyMultiArm(statusstr, 4);
     // cout << vrfres << endl;
 
