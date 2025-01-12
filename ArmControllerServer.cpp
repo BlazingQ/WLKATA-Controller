@@ -8,6 +8,7 @@ ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
 void ArmControllerServer::runServer(int port) {
     overwriteToFile("", "json/control.json");
     overwriteToFile("", "json/status.json");
+    overwriteToFile("", "timeused.md");
 
     int server_fd = setup_server(port);
     if (server_fd < 0) {
@@ -76,8 +77,6 @@ void ArmControllerServer::runServer(int port) {
 
 void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
     auto starttime = timenow();
-    appendToFile("\noringinal status:", "json/status.json");
-    appendToFile(statusstr, "json/status.json");
     json statusjson = json::parse(statusstr);
     //armid here is vrfarm, vrfid is vrfcmd
     int armid = statusjson["ArmId"]; 
@@ -99,6 +98,8 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
             cout << "vrfmsgstr = "<< verifyMsg(armid, vrfid, 1) <<endl;
 
     }else {
+        appendToFile("\noringinal status:", "json/status.json");
+        appendToFile(statusstr, "json/status.json");
         json arms = preprocessStateJson(statusstr);
 
         //arms/jsonstr isempty is not considered to occur
