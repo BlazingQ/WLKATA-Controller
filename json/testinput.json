@@ -13,17 +13,10 @@
             "Behavior": [
                 {
                     "Mode": "Cartesian",
-                    "X": [183.67 ,0 ,230],
-                    "R": [0, 0, 0],
-                    "Motion type": "Joint",
-                    "Speed": -1
-                },
-                {
-                    "Mode": "Cartesian",
                     "X": [0 ,160 ,185],
                     "R": [0 ,-25 ,90],
                     "Motion type": "Joint",
-                    "Speed": -1
+                    "Speed": 2000
                 }
             ],
             "TargetState": {
@@ -43,17 +36,10 @@
             "Behavior": [
                 {
                     "Mode": "Cartesian",
-                    "X": [183.67 ,0 ,230],
-                    "R": [0, 0, 0],
-                    "Motion type": "Joint",
-                    "Speed": -1
-                },
-                {
-                    "Mode": "Cartesian",
                     "X": [0 ,-160 ,185],
                     "R": [0 ,-25 ,-90],
                     "Motion type": "Joint",
-                    "Speed": -1
+                    "Speed": 2000
                 }
             ],
             "TargetState": {
