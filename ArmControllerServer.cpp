@@ -31,41 +31,6 @@ void ArmControllerServer::runServer(int port) {
                 send_message(client_fd, "");
             }else{
                 oneRun(statusstr, client_fd, false);
-                // appendToFile("\noringinal status:", "json/status.json");
-                // appendToFile(statusstr, "json/status.json");
-                // json statusjson = json::parse(statusstr);
-                // //armid here is vrfarm, vrfid is vrfcmd
-                // int armid = statusjson["ArmId"]; 
-                // int vrfid = statusjson["VrfId"];
-                // json arms = preprocessStateJson(statusstr);
-                // if(!arms.empty()){
-                //     appendToFile("\nprocessed status", "json/status.json");
-                //     appendToFile(arms.dump(4), "json/status.json");
-                //     string jsonstr = transCmds(arms); // 调用命令处理函数
-                //     if(!jsonstr.empty()){
-                //         // bool res = verifyMultiArm(jsonstr, armid);
-                //         bool res = true;
-                //         std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
-                //         string vrfjsonstr = verifyMsg(armid, vrfid, res);
-                //         if(!res){
-                //             string controljsonstr = arm_control(jsonstr, armid);
-                //             appendToFile(controljsonstr, "json/control.json");
-                //             if (!controljsonstr.empty()) {
-                //                 lastControlTime = timenow();
-                //                 send_message(client_fd, controlMsg(vrfjsonstr, controljsonstr).c_str());
-                //             }else{
-                //                 send_message(client_fd, vrfjsonstr.c_str());
-                //             }
-                //         } else{
-                //             send_message(client_fd, vrfjsonstr.c_str());
-                //         }
-                //     }else{
-                //         send_message(client_fd, verifyMsg(armid, vrfid, 0).c_str());
-                //     }
-
-                //     auto endtime = timenow();
-                //     appendToFile(to_string(stoll(endtime) - stoll(starttime)), "timeused.md");
-                // }
             }
         }
 
@@ -107,6 +72,8 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
             appendToFile("\nprocessed status:", "json/status.json");
             appendToFile(arms.dump(4), "json/status.json");
             string jsonstr = transCmds(arms); // 调用命令处理函数
+            // appendToFile("\ninput:", "json/status.json");
+            // appendToFile(jsonstr, "json/status.json");
             if(!jsonstr.empty()){
                 bool res = verifyMultiArm(jsonstr, armid);
                 // bool res = true;
@@ -962,7 +929,7 @@ void ArmControllerServer::initializeArmConfigs() {
         }
     };
     armConfigs[3] = {
-        {"BasePosition", {800, 230, 0}},
+        {"BasePosition", {800, 210, 0}},
         {"Obstacles", 
             {
         
@@ -970,7 +937,7 @@ void ArmControllerServer::initializeArmConfigs() {
         }
     };
     armConfigs[4] = {
-        {"BasePosition", {800, -230, 0}},
+        {"BasePosition", {800, -210, 0}},
         {"Obstacles", 
             {
                 

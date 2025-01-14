@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <fstream>
+
+using namespace std;
 
 // void listen(const char* dstIP, int dstPort);
 // void send(const char* dstIP, int dstPort, char* message);
@@ -15,5 +18,7 @@ int wait_for_connection(int server_fd);
 bool send_message(int sock, const char* message);
 bool receive_message(int sock, char* buffer, size_t buffer_size);
 void close_connection(int sock);
+
+void appendToFile2(const string& str, const string& filename);
 
 #endif

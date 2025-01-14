@@ -47,6 +47,8 @@ bool send_message(int sock, const char* message) {
         return false;
     }
     std::cout << "Message sent successfully." << std::endl;
+    appendToFile2("\nmessage:", "json/status.json");
+    appendToFile2(std::string(message), "json/status.json");
     return true;
 }
 
@@ -67,4 +69,18 @@ bool receive_message(int sock, char* buffer, size_t buffer_size) {
  void close_connection(int sock) {
     close(sock);
     // std::cout << "Connection closed." << std::endl;
+}
+
+void appendToFile2(const string& str, const string& filename) {
+    // 打开文件，使用 ios::app 模式以追加方式写入
+    ofstream file(filename, ios::app);
+    if (file.is_open()) {
+        // 写入字符串并添加换行符
+        file << str << endl;
+        // 关闭文件
+        file.close();
+    } else {
+        // 文件打开失败，输出错误消息
+        cerr << "Unable to open file: " << filename << endl;
+    }
 }
