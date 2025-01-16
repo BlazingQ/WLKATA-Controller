@@ -2,7 +2,7 @@
 
 ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
     initializeArmConfigs();
-    lastControlTime = timenow();
+    lastControlTime = "0";
 }
 
 void ArmControllerServer::runServer(int port) {
@@ -47,11 +47,11 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
     int armid = statusjson["ArmId"]; 
     int vrfid = statusjson["VrfId"];
     int isinit = statusjson["IsInit"];
-    // string constructtime = statusjson["ConstructTime"];
+    string constructtime = statusjson["ConstructTime"];
 
     //think status constructed before lastControlTime is not secure
-    // if(!istest && (stoll(constructtime) <= stoll(lastControlTime))){
-    if(false){
+    if(!istest && (stoll(constructtime) <= stoll(lastControlTime))){
+    // if(false){
         if(!istest)
             send_message(client_fd, verifyMsg(armid, vrfid, -1).c_str());
         else
@@ -76,8 +76,6 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
             // appendToFile(jsonstr, "json/status.json");
             if(!jsonstr.empty()){
                 bool res = verifyMultiArm(jsonstr, armid);
-                // bool res = true;
-                // std::this_thread::sleep_for(std::chrono::milliseconds(300)); //simulate verify
                 string vrfmsgstr = verifyMsg(armid, vrfid, res);
                 if(!res){
                     string controljsonstr = arm_control(jsonstr, armid);
@@ -620,12 +618,7 @@ string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const in
     json jsonmsg;
     jsonmsg["ArmId"] = armid;
     jsonmsg["VrfId"] = vrfid;
-    if(vrfres){
-        jsonmsg["VrfRes"] = 1;
-    }
-    else{
-        jsonmsg["VrfRes"] = 0;
-    }
+    jsonmsg["VrfRes"] = vrfres;
     jsonmsg["Time"] = timenow(); //time used to compare verify sequence, maybe useless now
     jsonmsg["Cmds"] = "";
     vrfmsg = jsonmsg.dump(4);
@@ -643,11 +636,6 @@ string ArmControllerServer::controlMsg(const string& vrfjsonstr, const string& c
         if(component["ArmId"] == jsonmsg["ArmId"]){
             for(const auto& behavior: component["Behavior"]){
                 if(!cmds.empty()){
-                    cmds += ",";
-                }
-                cmds += generateCmd(behavior);
-                //test for 2 control cmds
-                if(!cmds.empty()){  
                     cmds += ",";
                 }
                 cmds += generateCmd(behavior);
@@ -929,7 +917,7 @@ void ArmControllerServer::initializeArmConfigs() {
         }
     };
     armConfigs[3] = {
-        {"BasePosition", {800, 210, 0}},
+        {"BasePosition", {800, 215, 0}},
         {"Obstacles", 
             {
         
@@ -937,7 +925,7 @@ void ArmControllerServer::initializeArmConfigs() {
         }
     };
     armConfigs[4] = {
-        {"BasePosition", {800, -210, 0}},
+        {"BasePosition", {800, -217, 0}},
         {"Obstacles", 
             {
                 
