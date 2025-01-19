@@ -610,6 +610,8 @@ string ArmControllerServer::generateCmd(const json& behavior) {
         cmd += axis[i] + doubleToStr(behavior["R"][i]) + " ";
     }
 
+    cmd += "F2000";
+    
     return cmd;
 }
 
