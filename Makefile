@@ -2,7 +2,7 @@
 CC=g++
 
 # 编译器标志，添加-std=c++11以支持C++11特性
-CFLAGS=-g -Wall
+CFLAGS=-g -Wall -O2 -fPIC
 
 # 链接器标志，指定要链接的库文件
 LDFLAGS=-L./arm_converter/lib -L./arm_controller/lib \
