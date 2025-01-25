@@ -5,6 +5,7 @@ ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
     lastControlTime = "0";
 }
 
+
 void ArmControllerServer::runServer(int port) {
     overwriteToFile("", "json/control.json");
     overwriteToFile("", "json/status.json");
@@ -38,6 +39,58 @@ void ArmControllerServer::runServer(int port) {
     }
 
     close_connection(server_fd);
+}
+
+//传入参数为cmds，补全json其余部分
+
+void ArmControllerServer::visualize(string str, int armid){
+    json j = json::array();
+    json component;
+    component["ArmId"] = armid;
+    component["Locs"] = "198.67,0,230.72,0,0,0";
+    component["Delay"] = 0;
+
+    istringstream iss(str);
+    string line;
+    string finalCmds = "";
+    string prevEndTime = "";
+    
+    while (getline(iss, line)) {
+        // 忽略空行
+        if (line.empty()) continue;
+        
+        // 如果是命令行
+        if (line.find("G") != string::npos) {
+            string startTimeStr, endTimeStr;
+            getline(iss, startTimeStr); 
+            getline(iss, endTimeStr);
+            // 添加Stay指令（如果需要）
+            if (!prevEndTime.empty()) {
+                long long endTime = stoll(prevEndTime);
+                long long startTime = stoll(startTimeStr);
+                if (startTime - endTime > 0) {
+                    // 添加Stay指令
+                    if (!finalCmds.empty()) {
+                        finalCmds += ",";
+                    }
+                    finalCmds += "G04 P" + to_string((startTime - endTime)/1000.0);
+                }
+            }
+            if (!finalCmds.empty()) {
+                finalCmds += ",";
+            }
+            finalCmds += line;
+            
+            prevEndTime = endTimeStr;
+        }
+    }
+    
+    component["Cmds"] = finalCmds;
+    
+    j.push_back(component);
+    string jsonstr = transCmds(j);
+    arm_visualize(jsonstr);
+
 }
 
 void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
@@ -230,7 +283,7 @@ json ArmControllerServer::preprocessStateJson(string statusstr){
             // 最终delay就是看下最小的starttime,调为0
             for(json& retarm: retarms){
                 int tempindex = retarm["ArmId"];
-                retarm["delay"] = finalstarttime[tempindex] - minstarttime;
+                retarm["Delay"] = finalstarttime[tempindex] - minstarttime;
             }
 
         }
@@ -435,6 +488,11 @@ json ArmControllerServer::parseCommand(const string& cmd) {
                 behavior["Motion type"] = "Linear";
             } else if (part == "G91"){
                 isincre = true;
+            } else if(part == "G04"){ //new added Stay Cmd, G04 Pxxx
+                behavior["Mode"] = "Stay";
+                iss >> part;
+                behavior["StayTime"] = stod(part.substr(1));
+                return behavior;
             }
         } else if (part[0] == 'X' || part[0] == 'Y' || part[0] == 'Z' ||
          part[0] == 'A' || part[0] == 'B' || part[0] == 'C') {
@@ -558,7 +616,8 @@ json ArmControllerServer::parseComponent(const json& singleArm, json& result){
     json lastCommand;
     bool hasTargetState = false;
     while (getline(iss, token, ',')) {
-        if (token.find("M20") != string::npos || token.find("M21") != string::npos) {
+        if (token.find("G00") != string::npos || token.find("G01") != string::npos
+            || token.find("G04") != string::npos) {
             json behavior = parseCommand(token);
             lastCommand = behavior;
             hasTargetState = true;
@@ -919,7 +978,7 @@ void ArmControllerServer::initializeArmConfigs() {
         }
     };
     armConfigs[3] = {
-        {"BasePosition", {800, 215, 0}},
+        {"BasePosition", {800, 202, 0}},
         {"Obstacles", 
             {
         
@@ -927,7 +986,7 @@ void ArmControllerServer::initializeArmConfigs() {
         }
     };
     armConfigs[4] = {
-        {"BasePosition", {800, -217, 0}},
+        {"BasePosition", {800, -205, 0}},
         {"Obstacles", 
             {
                 

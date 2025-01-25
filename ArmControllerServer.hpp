@@ -50,6 +50,7 @@ public:
     void oneRun(string statusstr, int client_fd = 0, bool istest = true);
     string transCmds(json arms);
     bool verifyMultiArm(const string& jsonStr, int targetArmId); 
+    void visualize(string str, int armid);
 };
 
 string doubleToStr(double value);
