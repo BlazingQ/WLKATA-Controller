@@ -41,8 +41,7 @@ void ArmControllerServer::runServer(int port) {
     close_connection(server_fd);
 }
 
-//传入参数为cmds，补全json其余部分
-
+//传入参数为cmds和执行时对应的starttime，endtime，补全json其余部分
 void ArmControllerServer::visualize(string str, int armid){
     json j = json::array();
     json component;
@@ -59,8 +58,7 @@ void ArmControllerServer::visualize(string str, int armid){
         // 忽略空行
         if (line.empty()) continue;
         
-        // 如果是命令行
-        if (line.find("G") != string::npos) {
+        if (line.find("G") != string::npos) { 
             string startTimeStr, endTimeStr;
             getline(iss, startTimeStr); 
             getline(iss, endTimeStr);
@@ -68,7 +66,7 @@ void ArmControllerServer::visualize(string str, int armid){
             if (!prevEndTime.empty()) {
                 long long endTime = stoll(prevEndTime);
                 long long startTime = stoll(startTimeStr);
-                if (startTime - endTime > 0) {
+                if (startTime - endTime >= 0.05) {
                     // 添加Stay指令
                     if (!finalCmds.empty()) {
                         finalCmds += ",";
@@ -82,14 +80,37 @@ void ArmControllerServer::visualize(string str, int armid){
             finalCmds += line;
             
             prevEndTime = endTimeStr;
+        }else if(line.find("M") != string::npos){
+            string startTimeStr, endTimeStr;
+            getline(iss, startTimeStr); 
+            getline(iss, endTimeStr);
+            // 添加Stay指令（如果需要）
+            if (!prevEndTime.empty()) {
+                long long endTime = stoll(prevEndTime);
+                long long startTime = stoll(startTimeStr);
+                if (startTime - endTime >= 0.05) {
+                    // 添加Stay指令
+                    if (!finalCmds.empty()) {
+                        finalCmds += ",";
+                    }
+                    finalCmds += "G04 P" + to_string((startTime - endTime)/1000.0);
+                }
+            }
+            if (!finalCmds.empty()) {
+                finalCmds += ",";
+            }
+            finalCmds += "G04 P1";
+            
+            prevEndTime = endTimeStr;
         }
     }
     
     component["Cmds"] = finalCmds;
+    cout<<"finalCmds = "<<finalCmds<<endl;
     
     j.push_back(component);
     string jsonstr = transCmds(j);
-    arm_visualize(jsonstr);
+    overwriteToFile(arm_visualize(jsonstr), "output.md");
 
 }
 
@@ -125,13 +146,16 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
             appendToFile("\nprocessed status:", "json/status.json");
             appendToFile(arms.dump(4), "json/status.json");
             string jsonstr = transCmds(arms); // 调用命令处理函数
-            // appendToFile("\ninput:", "json/status.json");
+            // appendToFile("\nVerifyInput:", "json/status.json");
             // appendToFile(jsonstr, "json/status.json");
             if(!jsonstr.empty()){
                 bool res = verifyMultiArm(jsonstr, armid);
                 string vrfmsgstr = verifyMsg(armid, vrfid, res);
                 if(!res){
-                    string controljsonstr = arm_control(jsonstr, armid);
+                    string controljsonstr;
+                    do{
+                        controljsonstr = arm_control(jsonstr, armid);
+                    }while(!checkXYZ(controljsonstr));
                     appendToFile(controljsonstr, "json/control.json");
                     if (!controljsonstr.empty()) {
                         string controlmsgstr = controlMsg(vrfmsgstr, controljsonstr);
@@ -170,8 +194,6 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
     return ;
 }
 
-
-
 /*封装arm_verify，将其验证两个机械臂安全的功能扩展到多机械臂*/
 bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId) {
     json j = json::parse(jsonStr);
@@ -191,9 +213,28 @@ bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId)
         return false;
     }
 
-    // 对目标机械臂与其他ID大于它的机械臂进行验证
+    //这部分的逻辑转移到树莓派端，避免麻烦
+    // if(targetArmId == 1 || targetArmId == 5){
+    //     json singleJson;
+    //     singleJson["Obstacles"] = j["Obstacles"];
+    //     singleJson["Components"] = json::array();
+    //     singleJson["Components"].push_back(components[targetIdx]);
+    //     return arm_verify(singleJson.dump());
+    // }
+
+    //在下面多机械臂验证不再考虑障碍物，仅自己关注自己的障碍物情况
+    json obsJson;
+    obsJson["Obstacles"] = j["Obstacles"];
+    obsJson["Components"] = json::array();
+    obsJson["Components"].push_back(components[targetIdx]);
+    bool res = arm_verify(obsJson.dump());
+    if(!res) {
+        return false;
+    }
+
+    // 对目标机械臂与其他ID大于它的机械臂进行验证，问题在于一旦只有一个机械臂，不会去验证自身的obstacle
     for(size_t i = 0; i < components.size(); i++) {
-        if(components[i]["ArmId"] <= targetArmId ){
+        if(components[i]["ArmId"] <= targetArmId) {
             if(components[i]["ArmId"] < targetArmId)
                 cout<<"no need to compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
             continue;
@@ -201,7 +242,7 @@ bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId)
         cout <<"compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
         // 构造仅包含两个机械臂的json
         json pairJson;
-        pairJson["Obstacles"] = j["Obstacles"];
+        // pairJson["Obstacles"] = j["Obstacles"];
         pairJson["Components"] = json::array();
         pairJson["Components"].push_back(components[targetIdx]);
         pairJson["Components"].push_back(components[i]);
@@ -686,6 +727,17 @@ string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const in
     return vrfmsg;
 }
 
+bool ArmControllerServer::checkXYZ(const string& controljsonstr){
+    json controljson = json::parse(controljsonstr);
+    for(const auto& component: controljson["Components"]){
+        for(const auto& behavior: component["Behavior"]){
+            if(behavior["X"][2] <= 10){
+                return false;
+            }
+        }
+    }
+    return true;
+}
 
 string ArmControllerServer::controlMsg(const string& vrfjsonstr, const string& controljsonstr){
     string controlmsg = "";
@@ -856,6 +908,7 @@ std::string timenow(){
     return to_string(millis);
 }
 
+//末尾添加换行符
 void appendToFile(const string& str, const string& filename) {
     // 打开文件，使用 ios::app 模式以追加方式写入
     ofstream file(filename, ios::app);
@@ -963,8 +1016,7 @@ void ArmControllerServer::initializeArmConfigs() {
         {"BasePosition", {0, 230, 0}},
         {"Obstacles", 
             {
-               
-        
+                
             }
         }
     };
@@ -973,7 +1025,6 @@ void ArmControllerServer::initializeArmConfigs() {
         {"Obstacles", 
             {
                 
-        
             }
         }
     };
@@ -981,7 +1032,7 @@ void ArmControllerServer::initializeArmConfigs() {
         {"BasePosition", {800, 202, 0}},
         {"Obstacles", 
             {
-        
+                
             }
         }
     };
@@ -999,8 +1050,10 @@ void ArmControllerServer::initializeArmConfigs() {
         {"BasePosition", {1600, -230, 0}},
         {"Obstacles", 
             {
-               
-            
+                {
+                    {"X", {1600, -40, 115}},
+                    {"Radius", 10}
+                }
             }
         }
     };

@@ -41,6 +41,7 @@ private:
     string jsonToCmds(const string& jsonString);
     string verifyMsg(const int armid, const int vrfid, const int vrfres);
     string controlMsg(const string& vrfjsonstr, const string& controljsonstr);
+    bool checkXYZ(const string& controljsonstr);
     void initializeArmConfigs();
     void updateLocs(string cmd, float locs[]);
 

@@ -71,6 +71,7 @@ bool receive_message(int sock, char* buffer, size_t buffer_size) {
     // std::cout << "Connection closed." << std::endl;
 }
 
+//专门为了这个cpp文件写的函数
 void appendToFile2(const string& str, const string& filename) {
     // 打开文件，使用 ios::app 模式以追加方式写入
     ofstream file(filename, ios::app);
