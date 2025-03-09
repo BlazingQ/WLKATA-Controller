@@ -40,6 +40,7 @@ private:
     string generateCmd(const json& behavior);
     string jsonToCmds(const string& jsonString);
     string verifyMsg(const int armid, const int vrfid, const int vrfres);
+    string vrfonlyMsg(string verifyMsg, json arms);
     string controlMsg(const string& vrfjsonstr, const string& controljsonstr);
     bool checkXYZ(const string& controljsonstr);
     void initializeArmConfigs();
@@ -47,8 +48,8 @@ private:
 
 public:
     ArmControllerServer();
-    void runServer(int port);
-    void oneRun(string statusstr, int client_fd = 0, bool istest = true);
+    void runServer(int port, bool vrfonly);
+    void oneRun(string statusstr, int client_fd = 0, bool istest = true, bool vrfonly = false);
     string transCmds(json arms);
     bool verifyMultiArm(const string& jsonStr, int targetArmId); 
     void visualize(string str, int armid);

@@ -6,7 +6,7 @@ ArmControllerServer::ArmControllerServer() : isincre(false), isangle(false) {
 }
 
 
-void ArmControllerServer::runServer(int port) {
+void ArmControllerServer::runServer(int port, bool vrfonly) {
     overwriteToFile("", "json/control.json");
     overwriteToFile("", "json/status.json");
     overwriteToFile("", "timeused.md");
@@ -31,7 +31,7 @@ void ArmControllerServer::runServer(int port) {
             if(statusstr.empty() || statusstr[0] == '^' ){
                 send_message(client_fd, "");
             }else{
-                oneRun(statusstr, client_fd, false);
+                oneRun(statusstr, client_fd, false, vrfonly);
             }
         }
 
@@ -114,7 +114,7 @@ void ArmControllerServer::visualize(string str, int armid){
 
 }
 
-void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
+void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest, bool vrfonly) {
     auto starttime = timenow();
     json statusjson = json::parse(statusstr);
     //armid here is vrfarm, vrfid is vrfcmd
@@ -125,11 +125,7 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
 
     //think status constructed before lastControlTime is not secure
     if(!istest && (stoll(constructtime) <= stoll(lastControlTime))){
-    // if(false){
-        if(!istest)
-            send_message(client_fd, verifyMsg(armid, vrfid, -1).c_str());
-        else
-            cout<< "vrfmsgstr = "<< verifyMsg(armid, vrfid, -1) <<endl;
+        send_message(client_fd, verifyMsg(armid, vrfid, -1).c_str());
     } else if(isinit){ //considering time complexity, ignore init verify
         if(!istest)
             send_message(client_fd, verifyMsg(armid, vrfid, 1).c_str());
@@ -150,8 +146,9 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
             // appendToFile(jsonstr, "json/status.json");
             if(!jsonstr.empty()){
                 bool res = verifyMultiArm(jsonstr, armid);
+                // bool res = false;
                 string vrfmsgstr = verifyMsg(armid, vrfid, res);
-                if(!res){
+                if(!res && !vrfonly){
                     string controljsonstr;
                     do{
                         controljsonstr = arm_control(jsonstr, armid);
@@ -170,6 +167,11 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest) {
                         else
                             cout << "vrfmsgstr = "<< vrfmsgstr<<endl;
                     }
+                } else if(!res && vrfonly){
+                    if(!istest)
+                        send_message(client_fd, vrfonlyMsg(vrfmsgstr, arms).c_str());
+                    else
+                        cout << "controlmsgstr = "<< vrfmsgstr<<endl;
                 } else{
                     if(!istest)
                         send_message(client_fd, vrfmsgstr.c_str());
@@ -242,7 +244,7 @@ bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId)
         cout <<"compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
         // 构造仅包含两个机械臂的json
         json pairJson;
-        // pairJson["Obstacles"] = j["Obstacles"];
+        pairJson["Obstacles"] = j["Obstacles"];
         pairJson["Components"] = json::array();
         pairJson["Components"].push_back(components[targetIdx]);
         pairJson["Components"].push_back(components[i]);
@@ -715,6 +717,24 @@ string ArmControllerServer::generateCmd(const json& behavior) {
     return cmd;
 }
 
+//目前结构有些混乱，验证不通过的场景太多了，先筛选指令类型，但是无法抵抗虚假报错
+string ArmControllerServer::vrfonlyMsg(string verifyMsg, json arms){
+    json vrfonlyjson = json::parse(verifyMsg);
+    int armid = vrfonlyjson["ArmId"];
+    for(json arm: arms){
+        if(arm["ArmId"] == armid){
+            string cmds = arm["Cmds"];
+            vector<string> locs = decodeCommaStr(arm["Locs"], 0, 6);
+            if(cmds.find("G") != string::npos){ //筛选验证不通过的情况为G系列指令
+                string newcmd = "M20 G90 G00 X"+locs[0]+" Y"+locs[1]+" Z"+locs[2]+" A"+locs[3]+" B"+locs[4]+" C"+locs[5]+" F2000";
+                vrfonlyjson["Cmds"] = "M20 G90 G00 X183.67 Y0 Z230 A0 B0 C0 F2000,"+newcmd;
+            }
+            break;
+        }
+    }
+    return vrfonlyjson.dump(4);
+}
+
 string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const int vrfres){
     string vrfmsg = "";
     json jsonmsg;
@@ -725,18 +745,6 @@ string ArmControllerServer::verifyMsg(const int armid, const int vrfid, const in
     jsonmsg["Cmds"] = "";
     vrfmsg = jsonmsg.dump(4);
     return vrfmsg;
-}
-
-bool ArmControllerServer::checkXYZ(const string& controljsonstr){
-    json controljson = json::parse(controljsonstr);
-    for(const auto& component: controljson["Components"]){
-        for(const auto& behavior: component["Behavior"]){
-            if(behavior["X"][2] <= 10){
-                return false;
-            }
-        }
-    }
-    return true;
 }
 
 string ArmControllerServer::controlMsg(const string& vrfjsonstr, const string& controljsonstr){
@@ -762,6 +770,18 @@ string ArmControllerServer::controlMsg(const string& vrfjsonstr, const string& c
     }
     controlmsg = jsonmsg.dump(4);
     return controlmsg;
+}
+
+bool ArmControllerServer::checkXYZ(const string& controljsonstr){
+    json controljson = json::parse(controljsonstr);
+    for(const auto& component: controljson["Components"]){
+        for(const auto& behavior: component["Behavior"]){
+            if(behavior["X"][2] <= 10){
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /*根据验证与控制生成的结果，将其重新封装为返回的cmd串。
@@ -1051,7 +1071,7 @@ void ArmControllerServer::initializeArmConfigs() {
         {"Obstacles", 
             {
                 {
-                    {"X", {1600, -40, 115}},
+                    {"X", {1612, 70, 125}},
                     {"Radius", 10}
                 }
             }
