@@ -523,6 +523,13 @@ json ArmControllerServer::parseCommand(const string& cmd) {
             else if(part == "M21"){
                 behavior["Mode"] = "Angle";
                 isangle = true;
+            }else if(part == "M3"){
+                behavior["Mode"] = "Stay";
+                behavior["StayTime"] = 1;
+                behavior["X"].push_back(locs[0]);
+                behavior["X"].push_back(locs[1]);
+                behavior["X"].push_back(locs[2]);
+                return behavior;
             }
         } else if (part[0] == 'G') {
             if (part == "G00") {
@@ -531,10 +538,13 @@ json ArmControllerServer::parseCommand(const string& cmd) {
                 behavior["Motion type"] = "Linear";
             } else if (part == "G91"){
                 isincre = true;
-            } else if(part == "G04"){ //new added Stay Cmd, G04 Pxxx
+            } else if(part == "G04"){ //new added Stay Cmd, G04 Pxxx, locs应该能始终保持正确，直接加
                 behavior["Mode"] = "Stay";
                 iss >> part;
                 behavior["StayTime"] = stod(part.substr(1));
+                behavior["X"].push_back(locs[0]);
+                behavior["X"].push_back(locs[1]);
+                behavior["X"].push_back(locs[2]);
                 return behavior;
             }
         } else if (part[0] == 'X' || part[0] == 'Y' || part[0] == 'Z' ||
@@ -660,7 +670,7 @@ json ArmControllerServer::parseComponent(const json& singleArm, json& result){
     bool hasTargetState = false;
     while (getline(iss, token, ',')) {
         if (token.find("G00") != string::npos || token.find("G01") != string::npos
-            || token.find("G04") != string::npos) {
+            || token.find("G04") != string::npos || token.find("M3") != string::npos) {
             json behavior = parseCommand(token);
             lastCommand = behavior;
             hasTargetState = true;
