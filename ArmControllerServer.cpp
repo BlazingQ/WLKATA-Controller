@@ -636,7 +636,7 @@ json ArmControllerServer::parseCommand(const string& cmd) {
 }
 
 /*解析从客户端传来的当前状态，根据armId和服务器端的arm基准位置坐标可以
-获取全局位置坐标，其他信息全部由客户端提供。 */
+获取全局位置坐标和与该arm相关的障碍物，其他信息全部由客户端提供。 */
 json ArmControllerServer::parseComponent(const json& singleArm, json& result){
     json component;
     int armindex = singleArm["ArmId"];
@@ -1071,7 +1071,11 @@ void ArmControllerServer::initializeArmConfigs() {
         {"Obstacles", 
             {
                 {
-                    {"X", {1612, 70, 125}},
+                    {"X", {1615, 70, 125}},
+                    {"Radius", 10}
+                },
+                {
+                    {"X", {1600, -40, 125}},
                     {"Radius", 10}
                 }
             }
