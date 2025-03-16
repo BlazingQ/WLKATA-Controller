@@ -142,8 +142,8 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest, b
             appendToFile("\nprocessed status:", "json/status.json");
             appendToFile(arms.dump(4), "json/status.json");
             string jsonstr = transCmds(arms); // 调用命令处理函数
-            // appendToFile("\nVerifyInput:", "json/status.json");
-            // appendToFile(jsonstr, "json/status.json");
+            appendToFile("\nVerifyInput:", "json/status.json");
+            appendToFile(jsonstr, "json/status.json");
             if(!jsonstr.empty()){
                 bool res = verifyMultiArm(jsonstr, armid);
                 // bool res = false;
@@ -529,6 +529,9 @@ json ArmControllerServer::parseCommand(const string& cmd) {
                 behavior["X"].push_back(locs[0]);
                 behavior["X"].push_back(locs[1]);
                 behavior["X"].push_back(locs[2]);
+                behavior["R"].push_back(locs[3]);
+                behavior["R"].push_back(locs[4]);
+                behavior["R"].push_back(locs[5]);
                 return behavior;
             }
         } else if (part[0] == 'G') {
@@ -545,6 +548,9 @@ json ArmControllerServer::parseCommand(const string& cmd) {
                 behavior["X"].push_back(locs[0]);
                 behavior["X"].push_back(locs[1]);
                 behavior["X"].push_back(locs[2]);
+                behavior["R"].push_back(locs[3]);
+                behavior["R"].push_back(locs[4]);
+                behavior["R"].push_back(locs[5]);
                 return behavior;
             }
         } else if (part[0] == 'X' || part[0] == 'Y' || part[0] == 'Z' ||
@@ -680,6 +686,9 @@ json ArmControllerServer::parseComponent(const json& singleArm, json& result){
 
     if (hasTargetState) {
         component["TargetState"] = lastCommand;
+        if(component["TargetState"]["Mode"] == "Stay"){
+            component["TargetState"]["Mode"] = "Cartesian";
+        }
     }
 
     if(component["Behavior"].empty()){//放弃之后的验证与控制生成
@@ -1081,11 +1090,11 @@ void ArmControllerServer::initializeArmConfigs() {
         {"Obstacles", 
             {
                 {
-                    {"X", {1615, 70, 125}},
+                    {"X", {1600, -70, 95}},
                     {"Radius", 10}
                 },
                 {
-                    {"X", {1600, -40, 125}},
+                    {"X", {1600, 66, 95}},
                     {"Radius", 10}
                 }
             }
