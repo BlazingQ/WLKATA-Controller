@@ -385,7 +385,9 @@ pair<pair<int, int>, json> ArmControllerServer::getVrfArmInfo(json armjson, int 
         if(!locallocsstr.empty()){
             locallocsstr += ",";
         }
-        locallocsstr += to_string(locallocs[i]);
+        ostringstream oss;
+        oss << fixed << setprecision(2) << locallocs[i];
+        locallocsstr += oss.str();
     }
     newarmjson["Locs"] = locallocsstr;
     //不需要starttime，在执行时看的是delay，但是加上方便看效果
@@ -474,7 +476,9 @@ pair<int, json> ArmControllerServer::getOtherArmInfo(json armjson, pair<int, int
         if(!locallocsstr.empty()){
             locallocsstr += ",";
         }
-        locallocsstr += to_string(locallocs[i]);
+        ostringstream oss;
+        oss << fixed << setprecision(2) << locallocs[i];
+        locallocsstr += oss.str();
     }
     newarmjson["Locs"] = locallocsstr;
     //不需要starttime，在执行时看的是delay，但是加上方便看效果
