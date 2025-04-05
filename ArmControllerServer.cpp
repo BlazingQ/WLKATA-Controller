@@ -142,8 +142,8 @@ void ArmControllerServer::oneRun(string statusstr, int client_fd, bool istest, b
             appendToFile("\nprocessed status:", "json/status.json");
             appendToFile(arms.dump(4), "json/status.json");
             string jsonstr = transCmds(arms); // 调用命令处理函数
-            appendToFile("\nVerifyInput:", "json/status.json");
-            appendToFile(jsonstr, "json/status.json");
+            // appendToFile("\nVerifyInput:", "json/status.json");
+            // appendToFile(jsonstr, "json/status.json");
             if(!jsonstr.empty()){
                 bool res = verifyMultiArm(jsonstr, armid);
                 // bool res = false;
@@ -215,6 +215,12 @@ bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId)
         return false;
     }
 
+    if(components[targetIdx]["Behavior"].empty() || 
+        (components[targetIdx]["Behavior"].size() == 1 && components[targetIdx]["Behavior"][0]["Mode"] == "Stay")){
+        cout << "No move cmd(G00/G01) in the target arm, skip verification" << endl;
+        return true; 
+    }
+
     //这部分的逻辑转移到树莓派端，避免麻烦
     // if(targetArmId == 1 || targetArmId == 5){
     //     json singleJson;
@@ -236,10 +242,20 @@ bool ArmControllerServer::verifyMultiArm(const string& jsonStr, int targetArmId)
 
     // 对目标机械臂与其他ID大于它的机械臂进行验证，问题在于一旦只有一个机械臂，不会去验证自身的obstacle
     for(size_t i = 0; i < components.size(); i++) {
-        if(components[i]["ArmId"] <= targetArmId) {
-            if(components[i]["ArmId"] < targetArmId)
-                cout<<"no need to compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
+        if(components[i]["ArmId"] == targetArmId) {
             continue;
+        }else if(components[i]["ArmId"] < targetArmId){
+            bool hasStay = false;
+            for(auto behavior: components[i]["Behavior"]){
+                if(behavior["Mode"] == "Stay"){
+                    hasStay = true;
+                    break;
+                }
+            }
+            if(!hasStay){
+                cout <<"no need to compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
+                continue; // 如果没有stay指令，跳过验证
+            }
         }
         cout <<"compare main arm "<<targetArmId<<" with arm "<<components[i]["ArmId"]<<endl;
         // 构造仅包含两个机械臂的json
